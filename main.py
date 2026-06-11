@@ -110,11 +110,18 @@ def new_kill_v3(history, mid):
     h = [x.get("combo", x.get("combination", "小单")) for x in history[-30:]] if history else forms
     counts = Counter(h)
     idx = mid % 5
-    if idx == 0: target = max(forms, key=lambda x: counts.get(x, 0))
-    elif idx == 1: target = min(forms, key=lambda x: counts.get(x, 0))
-    elif idx == 2: target = {"大单":"小双","小双":"大单","大双":"小单","小单":"大双"}.get(h[0] if h else "小单", "小单")
-    elif idx == 3: target = forms[int(history[0].get('nbr', 0)) if history else 0) % 4]
-    else: total = sum(counts.values()) + 1; target = min(forms, key=lambda x: (counts.get(x,0)+1)/total)
+    if idx == 0:
+        target = max(forms, key=lambda x: counts.get(x, 0))
+    elif idx == 1:
+        target = min(forms, key=lambda x: counts.get(x, 0))
+    elif idx == 2:
+        target = {"大单":"小双","小双":"大单","大双":"小单","小单":"大双"}.get(h[0] if h else "小单", "小单")
+    elif idx == 3:
+        nbr = int(history[0].get('nbr', 0)) if history else 0
+        target = forms[nbr % 4]
+    else:
+        total = sum(counts.values()) + 1
+        target = min(forms, key=lambda x: (counts.get(x,0)+1)/total)
     return [target]
 
 for i in range(1, 101):
@@ -153,7 +160,7 @@ class ModelManager:
         self.kill_model_ids = [i for i in range(1, 701)] + [i for i in range(2001, 2501)]
 
     def find_best_kill_model(self, history):
-        """胜率前3随机选，避免一直杀同一个"""
+        """胜率前3随机选"""
         if len(history) < 10: return "小双", 0, 0
         results = []
         total = min(100, len(history) - 1)
@@ -170,8 +177,8 @@ class ModelManager:
             rate = win / total if total > 0 else 0
             results.append((mid, rate, md["func"](history)[0]))
         results.sort(key=lambda x: x[1], reverse=True)
-        top3 = results[:3]
-        best = random.choice(top3)
+        top3 = results[:3] if len(results) >= 3 else results
+        best = random.choice(top3) if top3 else (0, 0, "小双")
         return best[2], best[1], best[0]
 
 model_manager = ModelManager()
@@ -261,7 +268,7 @@ async def ws_handler(websocket: WebSocket, client_id: str):
             data = await websocket.receive_json()
             t = data.get("type", "")
             if t == "ping": await manager.send(client_id, {"type": "pong"})
-            elif t == "check_status": 
+            elif t == "check_status":
                 await check_saved_sessions(client_id)
                 await handle_get_latest(client_id)
             elif t == "send_code": await handle_send_code(client_id, data)
@@ -469,7 +476,7 @@ async def handle_stop_betting(client_id, data):
 # ==================== 启动 ====================
 if __name__ == "__main__":
     print("=" * 50)
-    print("小鶴神 · 智投PC v4.0")
+    print(" · 小鶴神 · 智投PC v4.0")
     print(f"📡 http://{Config.HOST}:{Config.PORT}")
     print(f"🧠 杀组:1201 | ABC大小:200 | 延迟:{Config.BET_DELAY}s")
     print("=" * 50)
