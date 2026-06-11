@@ -80,7 +80,7 @@
 
 <div class="topbar">
     <button class="back-btn hidden" id="backBtn" onclick="goBack()">← 返回</button>
-    <div class="logo">🦅 小鶴神<span> · 智投PC</span></div>
+    <div class="logo">小鶴神<span> · 智投PC</span></div>
     <div class="acct"><div class="dot" id="statusDot"></div><span id="statusText">未登录</span></div>
 </div>
 
@@ -150,6 +150,12 @@
         <div class="tc" style="margin-top:10px">
             <div class="fg"><label class="fl">倍投乘数</label><input type="number" class="fi" id="multiplierInput" value="2.0" step="0.1"></div>
             <div class="fg"><label class="fl">最大倍投次数</label><input type="number" class="fi" id="maxLossInput" value="5"></div>
+        </div>
+        <div class="fg" style="margin-top:8px">
+            <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:6px">
+                <input type="checkbox" id="customTagOn" onchange="document.getElementById('customTag').classList.toggle('hidden',!this.checked)"> 启用自定义尾缀
+            </label>
+            <input type="text" class="fi hidden" id="customTag" placeholder="输入尾缀文字，如：小鶴神nb" maxlength="30">
         </div>
         <button class="btn bs" onclick="startBetting()">🚀 开始自动投注</button>
     </div>
@@ -406,8 +412,9 @@ function startBetting(){
     if(!S.logged){log('error','请先登录');spn('login');return}
     if(!S.selCh.id){log('error','请先选择频道');spn('channels');return}
     if(S.mode==='kill'&&!C.some(c=>S.amts[c]>0)){log('error','请设置金额');return}
-    const cf={mode:S.mode,killedCombo:S.killed,amounts:S.amts,extremeNumbers:S.exts,extremeAmount:parseInt(document.getElementById('extremeAmount')?.value||1000),abcAmount:parseInt(document.getElementById('abcAmount')?.value||1000),balls:[],multiplier:parseFloat(document.getElementById('multiplierInput').value)};
+    const cf={mode:S.mode,killedCombo:S.killed,amounts:S.amts,extremeNumbers:S.exts,extremeAmount:parseInt(document.getElementById('extremeAmount')?.value||1000),abcAmount:parseInt(document.getElementById('abcAmount')?.value||1000),balls:[],multiplier:parseFloat(document.getElementById('multiplierInput').value),maxLoss:parseInt(document.getElementById('maxLossInput').value)};
     if(S.mode==='abc'){if(document.getElementById('abcA').checked)cf.balls.push('A');if(document.getElementById('abcB').checked)cf.balls.push('B');if(document.getElementById('abcC').checked)cf.balls.push('C')}
+    if(document.getElementById('customTagOn').checked){cf.customTag=document.getElementById('customTag').value.trim()}
     if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'start_betting',phone:S.selAcc,channel_id:S.selCh.id,mode:S.mode,config:cf}));
 }
 function stopBetting(){if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'stop_betting',phone:S.selAcc,channel_id:S.selCh.id}));S.running=false;document.getElementById('runStatus').textContent='已停止'}
