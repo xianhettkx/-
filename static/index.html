@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>小鶴神 · 智能投注控制台 v3.2</title>
+    <title>小鶴神 · 智投PC</title>
     <style>
         :root {
             --bg: #0a0e17; --card: #141b24; --card-hover: #1a2332; --border: #1e2d3d;
@@ -52,7 +52,6 @@
         .mode-tab { flex: 1; padding: 10px 6px; text-align: center; background: var(--bg); border: 2px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; font-size: 12px; font-weight: 600; }
         .mode-tab.active { border-color: var(--primary); background: rgba(59,130,246,0.1); color: var(--primary); }
 
-        /* 4个组合卡片 */
         .combo-cards { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 12px; }
         .combo-card { padding: 12px; background: var(--bg); border: 2px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; text-align: center; position: relative; transition: all 0.2s; }
         .combo-card.bet { border-color: var(--success); background: rgba(16,185,129,0.06); }
@@ -67,12 +66,11 @@
         .amount-row { display: flex; align-items: center; gap: 8px; padding: 10px; background: var(--bg); border-radius: var(--radius-sm); margin-bottom: 6px; border: 1px solid var(--border); }
         .amount-row .combo-label { width: 45px; font-weight: 600; font-size: 13px; }
         .amount-row input { flex: 1; padding: 8px; background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: 14px; text-align: center; font-family: inherit; }
-        .amount-row input.focus { border-color: var(--primary); }
+        .amount-row input:focus { border-color: var(--primary); }
         .odds-badge { font-size: 10px; padding: 2px 6px; border-radius: 8px; }
         .odds-low { background: var(--warning-bg); color: var(--warning); }
         .odds-high { background: var(--purple-bg); color: var(--purple); }
 
-        /* 方案保存 */
         .plan-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
         .plan-item { padding: 6px 12px; background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius-sm); cursor: pointer; font-size: 12px; }
         .plan-item.selected { border-color: var(--primary); background: rgba(59,130,246,0.1); color: var(--primary); }
@@ -96,7 +94,7 @@
 
 <div class="topbar">
     <button class="back-btn hidden" id="backBtn" onclick="goBack()">← 返回</button>
-    <div class="logo">小鶴神PC28 v3.2</div>
+    <div class="logo">小鶴神<span> · 智投PC</span></div>
     <div class="account-indicator" id="accountIndicator">
         <div class="dot" id="statusDot"></div>
         <span id="statusText">未登录</span>
@@ -105,7 +103,6 @@
 
 <div class="main-container">
 
-    <!-- 最新开奖 -->
     <div class="latest-bar">
         <span>📊</span>
         <span id="latestQihao">加载中...</span>
@@ -122,7 +119,7 @@
         <button class="btn btn-primary" id="btnLogin" onclick="handleLogin()">📨 发送验证码</button>
     </div>
 
-    <!-- 频道选择 -->
+    <!-- 频道 -->
     <div class="card hidden" id="panel-channels">
         <div class="card-title">💬 选择频道</div>
         <div class="form-group"><label class="form-label">账号</label><select class="form-select" id="accountSelect" onchange="onAccountChange()"></select></div>
@@ -131,25 +128,19 @@
         <button class="btn btn-primary" onclick="confirmChannel()" id="btnConfirmChannel" disabled>✅ 确认</button>
     </div>
 
-    <!-- 投注设置 -->
+    <!-- 设置 -->
     <div class="card hidden" id="panel-settings">
         <div class="card-title">🎯 投注设置</div>
-
-        <!-- 模式 -->
         <div class="mode-tabs">
             <div class="mode-tab active" onclick="switchMode('kill')" id="tab-kill">🎯 杀组</div>
             <div class="mode-tab" onclick="switchMode('abc')" id="tab-abc">🔮 杀ABC球</div>
             <div class="mode-tab" onclick="switchMode('extreme')" id="tab-extreme">🎪 追极值</div>
         </div>
-
-        <!-- 方案选择 -->
         <div id="planSection" class="form-group">
             <label class="form-label">已保存方案</label>
             <div class="plan-list" id="planList"></div>
             <button class="btn btn-outline btn-sm" onclick="savePlan()">💾 保存当前为方案</button>
         </div>
-
-        <!-- 杀组 -->
         <div id="settings-kill">
             <div class="form-label">杀组预测 <button class="btn btn-outline btn-sm" onclick="refreshPrediction()">🔄 刷新</button></div>
             <div class="combo-cards" id="comboCards"></div>
@@ -159,8 +150,6 @@
             <div class="form-label" style="margin-top:8px;">投注金额 <span style="color:var(--text-secondary);font-weight:400;">（输入一项自动计算）</span></div>
             <div id="amountInputs"></div>
         </div>
-
-        <!-- 杀ABC球 -->
         <div id="settings-abc" class="hidden">
             <div class="abc-checks">
                 <label class="abc-check"><input type="checkbox" id="abcA" checked onchange="refreshPrediction()"> A球</label>
@@ -171,15 +160,11 @@
             <div id="abcResults"></div>
             <div class="form-group"><label class="form-label">每个号码金额</label><input type="number" class="form-input" id="abcAmount" value="1000" min="1"></div>
         </div>
-
-        <!-- 追极值 -->
         <div id="settings-extreme" class="hidden">
             <div class="form-label">选择极值号码</div>
             <div class="extreme-grid" id="extremeGrid"></div>
             <div class="form-group"><label class="form-label">每个号码金额</label><input type="number" class="form-input" id="extremeAmount" value="1000" min="1"></div>
         </div>
-
-        <!-- 通用 -->
         <div class="two-col" style="margin-top:10px;">
             <div class="form-group"><label class="form-label">倍投乘数</label><input type="number" class="form-input" id="multiplierInput" value="2.0" step="0.1"></div>
             <div class="form-group"><label class="form-label">最大倍投次数</label><input type="number" class="form-input" id="maxLossInput" value="5"></div>
@@ -202,7 +187,6 @@
 </div>
 
 <script>
-// ==================== 状态 ====================
 const S = {
     isLoggedIn: false, currentPhone: '',
     accounts: {}, selectedAccount: '', selectedChannel: {id:'',name:''},
@@ -221,13 +205,11 @@ const S = {
 const COMBOS = ['大单','小单','大双','小双'];
 const EX = [0,1,2,3,4,23,24,25,26,27];
 
-// ==================== 持久化 ====================
 function loadPlans() { try { S.plans = JSON.parse(localStorage.getItem('pc28_plans')||'{}'); } catch(e) { S.plans = {}; } }
 function savePlans() { localStorage.setItem('pc28_plans', JSON.stringify(S.plans)); }
 function loadAmounts() { try { const a = JSON.parse(localStorage.getItem('pc28_amounts')); if (a) S.amounts = a; } catch(e) {} }
 function saveAmounts() { localStorage.setItem('pc28_amounts', JSON.stringify(S.amounts)); }
 
-// ==================== WebSocket ====================
 let ws, wsId = 'pc28_' + Date.now();
 function connectWS() {
     ws = new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws/${wsId}`);
@@ -314,7 +296,6 @@ function updateLoginUI(name) {
     document.getElementById('statusText').textContent = name + ' · 已登录';
 }
 
-// ==================== 面板导航 ====================
 function showPanel(name) {
     if (S.panelHistory[S.panelHistory.length-1] !== name) S.panelHistory.push(name);
     ['login','channels','settings','running'].forEach(n => document.getElementById('panel-'+n).classList.toggle('hidden', n !== name));
@@ -324,14 +305,9 @@ function showPanel(name) {
     if (name === 'running') updateBetPreview();
 }
 function goBack() {
-    if (S.panelHistory.length > 1) {
-        S.panelHistory.pop();
-        const prev = S.panelHistory.pop();
-        showPanel(prev);
-    }
+    if (S.panelHistory.length > 1) { S.panelHistory.pop(); const prev = S.panelHistory.pop(); showPanel(prev); }
 }
 
-// ==================== 登录 ====================
 function handleLogin() {
     const phone = document.getElementById('phoneInput').value.trim();
     if (!phone.startsWith('+')) { log('error','请输入正确手机号'); return; }
@@ -353,7 +329,6 @@ function handleLogin() {
     }
 }
 
-// ==================== 频道 ====================
 function updateAccountSelect() {
     const s = document.getElementById('accountSelect');
     s.innerHTML = '<option value="">-- 选择账号 --</option>';
@@ -379,7 +354,6 @@ function confirmChannel() {
 }
 document.addEventListener('change', e => { if (e.target.id === 'channelSelect') checkChannelConfirm(); });
 
-// ==================== 模式 ====================
 function switchMode(m) {
     S.mode = m;
     document.getElementById('tab-kill').classList.toggle('active', m==='kill');
@@ -393,7 +367,6 @@ function switchMode(m) {
     refreshPrediction();
 }
 
-// ==================== 方案系统 ====================
 function savePlan() {
     const name = prompt('方案名称:', '方案' + (Object.keys(S.plans).length + 1));
     if (!name) return;
@@ -412,12 +385,7 @@ function loadPlan(name) {
     log('info', `已加载方案"${name}"`);
 }
 function deletePlan(name) {
-    if (confirm(`删除方案"${name}"?`)) {
-        delete S.plans[name];
-        savePlans();
-        updatePlanList();
-        log('warning', `方案"${name}"已删除`);
-    }
+    if (confirm(`删除方案"${name}"?`)) { delete S.plans[name]; savePlans(); updatePlanList(); log('warning', `方案"${name}"已删除`); }
 }
 function updatePlanList() {
     const el = document.getElementById('planList');
@@ -426,7 +394,6 @@ function updatePlanList() {
     el.innerHTML = names.map(n => `<span class="plan-item" onclick="loadPlan('${n}')" ondblclick="deletePlan('${n}')">${n}</span>`).join('');
 }
 
-// ==================== 组合卡片 ====================
 function toggleKill(c) { S.killedCombo = c; updateComboCards(); renderAmountInputs(); }
 function updateComboCards() {
     const el = document.getElementById('comboCards');
@@ -444,7 +411,7 @@ function updateComboCards() {
     }).join('');
 }
 
-// ==================== 金额 ====================
+// ==================== 键盘不收起修复 ====================
 function renderAmountInputs() {
     if (S.mode !== 'kill') return;
     const combos = COMBOS.filter(c => c !== S.killedCombo);
@@ -453,25 +420,41 @@ function renderAmountInputs() {
         const o = S.odds[c];
         html += `<div class="amount-row">
             <span class="combo-label">${c}</span><span class="odds-badge ${o.g==='low'?'odds-low':'odds-high'}">${o.rate}</span>
-            <input type="number" id="amt-${c}" value="${S.amounts[c]||''}" placeholder="金额" oninput="onAmt('${c}',this.value)" onfocus="this.select()" inputmode="numeric">
+            <input type="number" id="amt-${c}" value="${S.amounts[c]||''}" placeholder="金额" oninput="onAmtKeepFocus('${c}',this)" inputmode="decimal">
         </div>`;
     });
     document.getElementById('amountInputs').innerHTML = html;
 }
-function onAmt(combo, val) {
-    if (!val || val <= 0) { COMBOS.forEach(c => S.amounts[c]=0); updateComboCards(); renderAmountInputs(); saveAmounts(); return; }
+
+function onAmtKeepFocus(combo, input) {
+    const val = input.value;
+    if (!val || val <= 0) {
+        COMBOS.forEach(c => S.amounts[c] = 0);
+        updateAmountInputsNoRender();
+        updateComboCards();
+        saveAmounts();
+        return;
+    }
     const rk = '杀' + S.killedCombo;
     const rd = S.ratioMap[rk];
     if (!rd) return;
     const res = rd.calc(combo, parseInt(val));
-    for (const [c,a] of Object.entries(res)) S.amounts[c] = a;
+    for (const [c, a] of Object.entries(res)) S.amounts[c] = a;
     S.amounts[S.killedCombo] = 0;
+    updateAmountInputsNoRender();
     updateComboCards();
-    renderAmountInputs();
     saveAmounts();
 }
 
-// ==================== 极值 ====================
+function updateAmountInputsNoRender() {
+    COMBOS.forEach(c => {
+        const inp = document.getElementById('amt-' + c);
+        if (inp && document.activeElement !== inp) {
+            inp.value = S.amounts[c] || '';
+        }
+    });
+}
+
 function initExtreme() {
     const g = document.getElementById('extremeGrid');
     EX.forEach(n => {
@@ -481,7 +464,6 @@ function initExtreme() {
     });
 }
 
-// ==================== 预测 ====================
 function refreshPrediction() {
     if (!ws || ws.readyState !== 1) return;
     if (S.mode === 'kill') ws.send(JSON.stringify({type:'get_prediction', mode:'kill'}));
@@ -495,12 +477,11 @@ function refreshPrediction() {
 }
 function getLatest() { if (ws && ws.readyState === 1) ws.send(JSON.stringify({type:'get_latest'})); }
 
-// ==================== 投注 ====================
 function startBetting() {
     if (!S.isLoggedIn) { log('error','请先登录'); showPanel('login'); return; }
     if (!S.selectedChannel.id) { log('error','请先选择频道'); showPanel('channels'); return; }
     if (S.mode === 'kill' && !COMBOS.filter(c => c !== S.killedCombo).some(c => S.amounts[c] > 0)) { log('error','请输入金额'); return; }
-    const cfg = { mode: S.mode, killedCombo: S.killedCombo, amounts: S.amounts, extremeNumbers: S.selectedExtremes, extremeAmount: parseInt(document.getElementById('extremeAmount')?.value || 1000), abcAmount: parseInt(document.getElementById('abcAmount')?.value || 1000), balls: [], multiplier: parseFloat(document.getElementById('multiplierInput').value), };
+    const cfg = { mode: S.mode, killedCombo: S.killedCombo, amounts: S.amounts, extremeNumbers: S.selectedExtremes, extremeAmount: parseInt(document.getElementById('extremeAmount')?.value || 1000), abcAmount: parseInt(document.getElementById('abcAmount')?.value || 1000), balls: [], multiplier: parseFloat(document.getElementById('multiplierInput').value) };
     if (S.mode === 'abc') { if (document.getElementById('abcA').checked) cfg.balls.push('A'); if (document.getElementById('abcB').checked) cfg.balls.push('B'); if (document.getElementById('abcC').checked) cfg.balls.push('C'); }
     if (ws && ws.readyState === 1) ws.send(JSON.stringify({type:'start_betting', phone:S.selectedAccount, channel_id:S.selectedChannel.id, mode:S.mode, config:cfg}));
 }
