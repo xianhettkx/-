@@ -1,58 +1,45 @@
 #!/usr/bin/env python3
-"""小鶴神 · 智投PC 后端服务"""
+"""小鶴神 · 智投PC 后端服务 v4.0"""
 
-import asyncio
-import json
-import os
-import re
-import random
-import math
+import asyncio, json, os, re, random, math
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, Optional, List
+from typing import Dict, Optional
 from collections import Counter
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
-import aiohttp
+import uvicorn, aiohttp
 
 from telethon import TelegramClient
-from telethon.errors import (
-    SessionPasswordNeededError,
-    PhoneCodeInvalidError,
-    PhoneCodeExpiredError,
-    FloodWaitError,
-)
+from telethon.errors import SessionPasswordNeededError, PhoneCodeInvalidError, PhoneCodeExpiredError, FloodWaitError
+from abc_size_models import ABCSizeModelManager
 
 # ==================== 配置 ====================
 class Config:
     API_ID = 2040
     API_HASH = "b18441a1ff607e10a989891a5462e627"
-    PC28_API = "https://pc28.help/api/kj.json?nbr=100"
     PORT = int(os.environ.get("PORT", 8000))
     HOST = "0.0.0.0"
     STATIC_DIR = Path("static")
     DATA_DIR = Path("data")
     SESSIONS_DIR = DATA_DIR / "sessions"
-    BET_DELAY = 30  # 开奖后延迟投注秒数
+    BET_DELAY = 30
 
 Config.STATIC_DIR.mkdir(exist_ok=True)
 Config.DATA_DIR.mkdir(exist_ok=True)
 Config.SESSIONS_DIR.mkdir(exist_ok=True)
 
-# ==================== FastAPI ====================
-app = FastAPI(title="小鶴神 · 智投PC", version="3.3")
+app = FastAPI(title="小鶴神 · 智投PC", version="4.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# ==================== 模型 ====================
+# ==================== 杀组模型 ====================
 COMBOS = ["大单", "小单", "大双", "小双"]
 ALL_MODELS = {}
 
-# --- 老模型 1-701 ---
 def old_slayer_factory(history_data, cfg):
     forms = ["大单", "小单", "大双", "小双"]
     h_slice = [h.get("combo", h.get("combination", "小单")) for h in history_data[:cfg['depth']]]
@@ -63,7 +50,7 @@ def old_slayer_factory(history_data, cfg):
         last_idx = forms.index(h_slice[0]) if h_slice else 0
         target = forms[(last_idx + cfg['offset']) % 4]
     else:
-        nbr = int(history_data[0].get('nbr', history_data[0].get('qihao', 0))) if history_data else 0
+        nbr = int(history_data[0].get('nbr', 0)) if history_data else 0
         target = forms[(nbr * cfg['m'] + cfg['s']) % 4]
     return [target]
 
@@ -126,7 +113,7 @@ def new_kill_v3(history, mid):
     if idx == 0: target = max(forms, key=lambda x: counts.get(x, 0))
     elif idx == 1: target = min(forms, key=lambda x: counts.get(x, 0))
     elif idx == 2: target = {"大单":"小双","小双":"大单","大双":"小单","小单":"大双"}.get(h[0] if h else "小单", "小单")
-    elif idx == 3: target = forms[int(history[0].get('nbr', history[0].get('qihao', 0)) if history else 0) % 4]
+    elif idx == 3: target = forms[int(history[0].get('nbr', 0)) if history else 0) % 4]
     else: total = sum(counts.values()) + 1; target = min(forms, key=lambda x: (counts.get(x,0)+1)/total)
     return [target]
 
@@ -134,7 +121,6 @@ for i in range(1, 101):
     mid = i + 600
     ALL_MODELS[mid] = {"func": lambda h, m=mid: new_kill_v3(h, m), "info": {"id": mid, "name": f"V3杀组 M{i}", "type": "杀组"}}
 
-# --- 500个新杀组模型 2001-2500 ---
 def dynamic_matrix_slayer(history, cfg):
     forms = ["大单", "小单", "大双", "小双"]
     h_slice = [h.get("combination", h.get("combo", "小单")) for h in history[:cfg['depth']]]
@@ -160,68 +146,16 @@ for idx in range(1, 501):
         cfg = {'type': "MATH_WAVE", 'depth': 5 + (idx % 30), 'bias': "NONE", 'offset': 0, 'm': (idx * 17) % 23 + 1, 's': (idx * 3) % 7}
     ALL_MODELS[model_id] = {"func": lambda h, c=cfg: dynamic_matrix_slayer(h, c), "info": {"id": model_id, "name": f"黄金矩阵杀组 M{model_id}", "type": "杀组"}}
 
-# --- 600个杀ABC球模型 3001-3600 ---
-def single_ball_slayer(keno_data, cfg, target_ball):
-    default_kill = 5
-    if not keno_data or len(keno_data) < cfg['depth'] + 5: return [default_kill]
-    try:
-        ball_history = []
-        for i in range(min(cfg['depth'], len(keno_data))):
-            nbrs = [int(n) for n in keno_data[i]["nbrs"].split(",")]
-            a_raw = sum([nbrs[j] for j in [1,4,7,10,13,16]]) % 10
-            b_raw = sum([nbrs[j] for j in [2,5,8,11,14,17]]) % 10
-            c_raw = sum([nbrs[j] for j in [3,6,9,12,15,18]]) % 10
-            ball_history.append([a_raw, b_raw, c_raw][target_ball])
-        if not ball_history: return [default_kill]
-        counts = {num: ball_history.count(num) for num in range(10)}
-        last_ball = ball_history[0]
-        if cfg['algo_type'] == "DYNAMIC_HOT_KILL":
-            kill_num = max(range(10), key=lambda x: counts[x])
-        elif cfg['algo_type'] == "DYNAMIC_COLD_KILL":
-            kill_num = min(range(10), key=lambda x: counts[x])
-        elif cfg['algo_type'] == "STEP_OFFSET":
-            kill_num = (last_ball + cfg['offset']) % 10
-        else:
-            issue_seed = keno_data[0].get('nbr', 1) if str(keno_data[0].get('nbr', '')).isdigit() else 1
-            kill_num = (issue_seed * cfg['m'] + cfg['s']) % 10
-        return [int(kill_num) % 10]
-    except:
-        return [default_kill]
-
-ball_configs = [
-    {"target": 0, "name": "A", "start_id": 3001},
-    {"target": 1, "name": "B", "start_id": 3201},
-    {"target": 2, "name": "C", "start_id": 3400}
-]
-for config in ball_configs:
-    for idx in range(1, 201):
-        model_id = config["start_id"] + idx - 1
-        if idx <= 60:
-            cfg = {'algo_type': "DYNAMIC_HOT_KILL", 'ball_name': config["name"], 'depth': 6 + (idx % 25), 'offset': 0, 'm': 0, 's': 0}
-        elif idx <= 120:
-            cfg = {'algo_type': "DYNAMIC_COLD_KILL", 'ball_name': config["name"], 'depth': 15 + (idx % 35), 'offset': 0, 'm': 0, 's': 0}
-        elif idx <= 160:
-            cfg = {'algo_type': "STEP_OFFSET", 'ball_name': config["name"], 'depth': 10, 'offset': (idx * 3) % 9 + 1, 'm': 0, 's': 0}
-        else:
-            cfg = {'algo_type': "混沌算子", 'ball_name': config["name"], 'depth': 5, 'offset': 0, 'm': (idx * 7) % 11 + 1, 's': idx % 7}
-        def make_launcher(c=cfg, t=config["target"]):
-            return lambda kd: single_ball_slayer(kd, c, t)
-        ALL_MODELS[model_id] = {"func": make_launcher(), "info": {"id": model_id, "name": f"【杀{config['name']}球】矩阵 M{model_id}", "type": "杀组"}}
-
 # ==================== 模型管理器 ====================
 class ModelManager:
     def __init__(self):
         self.all_models = ALL_MODELS
         self.kill_model_ids = [i for i in range(1, 701)] + [i for i in range(2001, 2501)]
-        self.abc_model_ids = {
-            'A': list(range(3001, 3201)),
-            'B': list(range(3201, 3401)),
-            'C': list(range(3400, 3601)),
-        }
 
     def find_best_kill_model(self, history):
+        """胜率前3随机选，避免一直杀同一个"""
         if len(history) < 10: return "小双", 0, 0
-        best_id, best_rate = None, 0
+        results = []
         total = min(100, len(history) - 1)
         for mid in self.kill_model_ids:
             md = self.all_models.get(mid)
@@ -234,40 +168,14 @@ class ModelManager:
                     if actual and actual != pred[0]: win += 1
                 except: continue
             rate = win / total if total > 0 else 0
-            if rate > best_rate: best_rate, best_id = rate, mid
-        if best_id:
-            result = self.all_models[best_id]["func"](history)
-            return result[0], best_rate, best_id
-        return "小双", 0, 0
-
-    def find_best_abc_model(self, keno_data, ball_type):
-        if not keno_data or len(keno_data) < 10: return 5, 0, 0
-        model_ids = self.abc_model_ids.get(ball_type, [])
-        best_id, best_rate = None, 0
-        total = min(100, len(keno_data) - 1)
-        for mid in model_ids:
-            md = self.all_models.get(mid)
-            if not md: continue
-            win = 0
-            for i in range(1, total):
-                try:
-                    pred = md["func"](keno_data[i:])
-                    nbrs = [int(n) for n in keno_data[i-1]["nbrs"].split(",")]
-                    target_map = {'A': 0, 'B': 1, 'C': 2}
-                    t = target_map[ball_type]
-                    a_raw = sum([nbrs[j] for j in [1,4,7,10,13,16]]) % 10
-                    b_raw = sum([nbrs[j] for j in [2,5,8,11,14,17]]) % 10
-                    c_raw = sum([nbrs[j] for j in [3,6,9,12,15,18]]) % 10
-                    if [a_raw, b_raw, c_raw][t] != pred[0]: win += 1
-                except: continue
-            rate = win / total if total > 0 else 0
-            if rate > best_rate: best_rate, best_id = rate, mid
-        if best_id:
-            result = self.all_models[best_id]["func"](keno_data)
-            return result[0], best_rate, best_id
-        return 5, 0, 0
+            results.append((mid, rate, md["func"](history)[0]))
+        results.sort(key=lambda x: x[1], reverse=True)
+        top3 = results[:3]
+        best = random.choice(top3)
+        return best[2], best[1], best[0]
 
 model_manager = ModelManager()
+abc_size_manager = ABCSizeModelManager()
 
 # ==================== 连接管理 ====================
 class ConnectionManager:
@@ -277,22 +185,19 @@ class ConnectionManager:
         self.login_states: Dict[str, dict] = {}
         self.betting_tasks: Dict[str, asyncio.Task] = {}
 
-    async def connect(self, ws: WebSocket, client_id: str):
+    async def connect(self, ws, cid):
         await ws.accept()
-        self.connections[client_id] = ws
-
-    def disconnect(self, client_id: str):
-        self.connections.pop(client_id, None)
-
-    async def send(self, client_id: str, data: dict):
-        ws = self.connections.get(client_id)
+        self.connections[cid] = ws
+    def disconnect(self, cid):
+        self.connections.pop(cid, None)
+    async def send(self, cid, data):
+        ws = self.connections.get(cid)
         if ws:
             try: await ws.send_json(data)
-            except: self.disconnect(client_id)
-
-    def get_client(self, phone: str): return self.clients.get(phone)
-    def save_client(self, phone: str, client: TelegramClient): self.clients[phone] = client
-    def remove_client(self, phone: str):
+            except: self.disconnect(cid)
+    def get_client(self, phone): return self.clients.get(phone)
+    def save_client(self, phone, client): self.clients[phone] = client
+    def remove_client(self, phone):
         self.clients.pop(phone, None)
         f = Config.SESSIONS_DIR / f"{phone.replace('+','')}.session"
         if f.exists(): f.unlink()
@@ -337,7 +242,7 @@ async def fetch_history(count=100):
 @app.get("/", response_class=HTMLResponse)
 async def root():
     f = Config.STATIC_DIR / "index.html"
-    return f.read_text(encoding='utf-8') if f.exists() else HTMLResponse("<h1>请放置 index.html</h1>")
+    return f.read_text(encoding='utf-8') if f.exists() else HTMLResponse("<h1>小鶴神 · 智投PC</h1>")
 
 @app.get("/health")
 async def health():
@@ -350,12 +255,15 @@ async def health():
 async def ws_handler(websocket: WebSocket, client_id: str):
     await manager.connect(websocket, client_id)
     try:
-        await manager.send(client_id, {"type": "connected", "message": "已连接小鶴神 · 智投PC", "timestamp": datetime.now().isoformat()})
+        await manager.send(client_id, {"type": "connected", "message": "已连接小鶴神 · 智投PC"})
         await check_saved_sessions(client_id)
         while True:
             data = await websocket.receive_json()
             t = data.get("type", "")
             if t == "ping": await manager.send(client_id, {"type": "pong"})
+            elif t == "check_status": 
+                await check_saved_sessions(client_id)
+                await handle_get_latest(client_id)
             elif t == "send_code": await handle_send_code(client_id, data)
             elif t == "verify_code": await handle_verify_code(client_id, data)
             elif t == "verify_password": await handle_verify_password(client_id, data)
@@ -424,7 +332,7 @@ async def handle_verify_code(client_id, data):
         await manager.send(client_id, {"type": "verify_code_result", "success": True, "phone": phone, "name": name, "user_id": me.id})
     except SessionPasswordNeededError:
         state["needs_2fa"] = True
-        await manager.send(client_id, {"type": "verify_code_result", "success": True, "need_password": True, "message": "需要两步验证"})
+        await manager.send(client_id, {"type": "verify_code_result", "success": True, "need_password": True})
     except PhoneCodeInvalidError:
         await manager.send(client_id, {"type": "verify_code_result", "success": False, "error": "验证码错误"})
     except PhoneCodeExpiredError:
@@ -474,9 +382,7 @@ async def handle_get_latest(client_id):
     history = await fetch_history(100)
     if history:
         latest = history[0]
-        await manager.send(client_id, {"type": "latest_data", "latest": {"qihao": latest['qihao'], "combo": latest['combo'], "sum": latest['sum'], "number": latest.get('number', '')}, "history_count": len(history)})
-    else:
-        await manager.send(client_id, {"type": "latest_data", "error": "获取失败"})
+        await manager.send(client_id, {"type": "latest_data", "latest": {"qihao": latest['qihao'], "combo": latest['combo'], "sum": latest['sum'], "number": latest.get('number', '')}})
 
 async def handle_get_prediction(client_id, data):
     mode = data.get("mode", "kill")
@@ -486,19 +392,10 @@ async def handle_get_prediction(client_id, data):
         return
     if mode == "kill":
         kill_target, rate, model_id = model_manager.find_best_kill_model(history)
-        bet_combos = [c for c in COMBOS if c != kill_target]
-        await manager.send(client_id, {"type": "prediction", "mode": "kill", "kill_target": kill_target, "bet_combos": bet_combos, "win_rate": round(rate * 100, 1), "model_id": model_id, "latest_qihao": history[0]['qihao'], "latest_combo": history[0]['combo'], "latest_sum": history[0]['sum']})
+        await manager.send(client_id, {"type": "prediction", "mode": "kill", "kill_target": kill_target, "win_rate": round(rate * 100, 1), "model_id": model_id, "latest_qihao": history[0]['qihao'], "latest_combo": history[0]['combo'], "latest_sum": history[0]['sum']})
     elif mode == "abc":
-        keno_data = []
-        for h in history:
-            nbr = h.get('number', '')
-            if '+' in nbr: keno_data.append({"nbrs": nbr.replace('+', ','), "nbr": h['qihao']})
-        results = {}
-        for ball in data.get("balls", ["A", "B", "C"]):
-            kill_num, rate, model_id = model_manager.find_best_abc_model(keno_data, ball)
-            bet_nums = [n for n in range(10) if n != kill_num]
-            results[ball] = {"kill_num": kill_num, "bet_nums": bet_nums, "win_rate": round(rate * 100, 1), "model_id": model_id}
-        await manager.send(client_id, {"type": "prediction", "mode": "abc", "results": results, "latest_qihao": history[0]['qihao'], "latest_combo": history[0]['combo']})
+        results = abc_size_manager.get_all_predictions(history)
+        await manager.send(client_id, {"type": "prediction", "mode": "abc", "results": results, "latest_qihao": history[0]['qihao'], "latest_combo": history[0]['combo'], "latest_sum": history[0]['sum']})
 
 # ==================== 投注 ====================
 async def handle_start_betting(client_id, data):
@@ -512,7 +409,7 @@ async def handle_start_betting(client_id, data):
     if task_key in manager.betting_tasks: manager.betting_tasks[task_key].cancel()
     task = asyncio.create_task(betting_loop(client_id, phone, int(channel_id), mode, config, client))
     manager.betting_tasks[task_key] = task
-    await manager.send(client_id, {"type": "betting_started", "success": True, "phone": phone, "channel_id": channel_id, "mode": mode})
+    await manager.send(client_id, {"type": "betting_started", "success": True})
 
 async def betting_loop(client_id, phone, channel_id, mode, config, client):
     last_qihao = None
@@ -523,10 +420,8 @@ async def betting_loop(client_id, phone, channel_id, mode, config, client):
             latest = history[0]; current_qihao = latest['qihao']
             if current_qihao == last_qihao: await asyncio.sleep(3); continue
 
-            # 开奖后延迟30秒再投注
             await manager.send(client_id, {"type": "bet_log", "message": f"[{datetime.now().strftime('%H:%M:%S')}] 新期 {current_qihao}，{Config.BET_DELAY}秒后投注..."})
             await asyncio.sleep(Config.BET_DELAY)
-
             last_qihao = current_qihao
             message = ""
 
@@ -535,20 +430,20 @@ async def betting_loop(client_id, phone, channel_id, mode, config, client):
                 bet_combos = [c for c in COMBOS if c != kill_target]
                 parts = [f"{c}{config.get('amounts', {}).get(c, 10000)}" for c in bet_combos]
                 message = " ".join(parts)
-                await manager.send(client_id, {"type": "bet_log", "message": f"[{datetime.now().strftime('%H:%M:%S')}] 期:{current_qihao} 杀:{kill_target} 胜率:{rate*100:.1f}%"})
+                await manager.send(client_id, {"type": "bet_log", "message": f"期:{current_qihao} 杀:{kill_target} 胜率:{rate*100:.1f}%"})
 
             elif mode == "abc":
-                keno_data = []
-                for h in history:
-                    nbr = h.get('number', '')
-                    if '+' in nbr: keno_data.append({"nbrs": nbr.replace('+', ','), "nbr": h['qihao']})
-                balls = config.get("balls", ["A"]); amount = config.get("abcAmount", 1000)
+                preds = abc_size_manager.get_all_predictions(history)
+                balls = config.get("balls", ["A"])
+                amount = config.get("abcAmount", 1000)
                 all_parts = []
                 for ball in balls:
-                    kill_num, rate, model_id = model_manager.find_best_abc_model(keno_data, ball)
-                    bet_nums = [n for n in range(10) if n != kill_num]
-                    all_parts.extend([f"{ball.lower()}{n}/{amount}" for n in bet_nums])
+                    info = preds.get(ball, {})
+                    pred = info.get('prediction', '小')
+                    nums = [0,1,2,3,4] if pred == '小' else [5,6,7,8,9]
+                    all_parts.extend([f"{ball.lower()}{n}/{amount}" for n in nums])
                 message = "\n".join(all_parts)
+                await manager.send(client_id, {"type": "bet_log", "message": f"期:{current_qihao} " + ", ".join([f"{b}{preds[b]['prediction']}({preds[b]['win_rate']}%)" for b in balls])})
 
             elif mode == "extreme":
                 extremes = config.get("extremeNumbers", []); amount = config.get("extremeAmount", 1000)
@@ -557,12 +452,10 @@ async def betting_loop(client_id, phone, channel_id, mode, config, client):
             if message:
                 try:
                     await client.send_message(channel_id, message)
-                    await manager.send(client_id, {"type": "bet_log", "message": f"✅ 已发送"})
+                    await manager.send(client_id, {"type": "bet_log", "message": "✅ 已发送"})
                 except FloodWaitError as e: await asyncio.sleep(e.seconds)
                 except Exception as e: await manager.send(client_id, {"type": "bet_log", "message": f"❌ {str(e)[:100]}", "error": True})
-
             await asyncio.sleep(5)
-
     except asyncio.CancelledError: pass
     except Exception as e: await manager.send(client_id, {"type": "bet_log", "message": f"异常: {str(e)[:200]}", "error": True})
 
@@ -576,8 +469,8 @@ async def handle_stop_betting(client_id, data):
 # ==================== 启动 ====================
 if __name__ == "__main__":
     print("=" * 50)
-    print("🦅 小鶴神 · 智投PC v3.3 启动")
+    print("小鶴神 · 智投PC v4.0")
     print(f"📡 http://{Config.HOST}:{Config.PORT}")
-    print(f"🧠 模型: {len(ALL_MODELS)} | 延迟投注: {Config.BET_DELAY}s")
+    print(f"🧠 杀组:1201 | ABC大小:200 | 延迟:{Config.BET_DELAY}s")
     print("=" * 50)
     uvicorn.run(app, host=Config.HOST, port=Config.PORT)
