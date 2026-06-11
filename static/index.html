@@ -1,0 +1,1333 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PC28 自动投注控制台</title>
+    <style>
+        :root {
+            --bg: #0a0e17;
+            --card: #141b24;
+            --card-hover: #1a2332;
+            --border: #1e2d3d;
+            --text: #e0e6ed;
+            --text-secondary: #8899aa;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --success: #10b981;
+            --success-bg: rgba(16,185,129,0.15);
+            --danger: #ef4444;
+            --danger-bg: rgba(239,68,68,0.15);
+            --warning: #f59e0b;
+            --warning-bg: rgba(245,158,11,0.15);
+            --purple: #8b5cf6;
+            --purple-bg: rgba(139,92,246,0.15);
+            --radius: 10px;
+            --radius-sm: 6px;
+            --shadow: 0 4px 24px rgba(0,0,0,0.3);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Segoe UI', -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* 顶部栏 */
+        .topbar {
+            background: var(--card);
+            border-bottom: 1px solid var(--border);
+            padding: 12px 28px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        .topbar .logo {
+            font-size: 20px;
+            font-weight: 700;
+            color: var(--primary);
+            letter-spacing: -0.5px;
+        }
+        .topbar .logo span { color: var(--text); margin-left: 4px; }
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        .account-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            background: var(--bg);
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            font-size: 13px;
+        }
+        .account-indicator .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--danger);
+        }
+        .account-indicator .dot.online { background: var(--success); }
+
+        /* 主布局 */
+        .main-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 24px 20px;
+        }
+
+        /* 步骤指示器 */
+        .steps {
+            display: flex;
+            gap: 0;
+            margin-bottom: 28px;
+            background: var(--card);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+        .step {
+            flex: 1;
+            padding: 14px 20px;
+            text-align: center;
+            font-size: 14px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: all 0.3s;
+            position: relative;
+            border-right: 1px solid var(--border);
+        }
+        .step:last-child { border-right: none; }
+        .step.active {
+            color: #fff;
+            background: var(--primary);
+            font-weight: 600;
+        }
+        .step.done {
+            color: var(--success);
+            background: var(--success-bg);
+        }
+        .step .step-num {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            line-height: 24px;
+            border-radius: 50%;
+            background: var(--border);
+            margin-right: 6px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        .step.active .step-num { background: rgba(255,255,255,0.3); }
+        .step.done .step-num { background: var(--success); color: #fff; }
+
+        /* 卡片 */
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
+        }
+        .card-title {
+            font-size: 17px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .card-title .icon { font-size: 20px; }
+
+        /* 表单 */
+        .form-group {
+            margin-bottom: 16px;
+        }
+        .form-label {
+            display: block;
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 6px;
+            font-weight: 500;
+        }
+        .form-input, .form-select {
+            width: 100%;
+            padding: 11px 14px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            font-size: 14px;
+            transition: border-color 0.2s;
+            font-family: inherit;
+        }
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59,130,246,0.15);
+        }
+        .form-input::placeholder { color: #4a5568; }
+        .form-select option { background: var(--card); color: var(--text); }
+
+        /* 按钮 */
+        .btn {
+            padding: 10px 20px;
+            border: none;
+            border-radius: var(--radius-sm);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+        .btn-primary {
+            background: var(--primary);
+            color: #fff;
+            width: 100%;
+            justify-content: center;
+            padding: 12px;
+            font-size: 15px;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px rgba(59,130,246,0.3);
+        }
+        .btn-success {
+            background: var(--success);
+            color: #fff;
+            width: 100%;
+            justify-content: center;
+            padding: 12px;
+            font-size: 15px;
+        }
+        .btn-success:hover:not(:disabled) {
+            filter: brightness(1.1);
+        }
+        .btn-danger {
+            background: var(--danger);
+            color: #fff;
+            width: 100%;
+            justify-content: center;
+            padding: 12px;
+            font-size: 15px;
+        }
+        .btn-danger:hover:not(:disabled) {
+            filter: brightness(1.1);
+        }
+        .btn-outline {
+            background: transparent;
+            border: 1px solid var(--border);
+            color: var(--text);
+        }
+        .btn-outline:hover:not(:disabled) {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+
+        /* 模式选择卡片 */
+        .mode-cards {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .mode-card {
+            background: var(--bg);
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: center;
+        }
+        .mode-card:hover {
+            border-color: var(--primary);
+            background: var(--card-hover);
+        }
+        .mode-card.selected {
+            border-color: var(--primary);
+            background: rgba(59,130,246,0.08);
+            box-shadow: 0 0 16px rgba(59,130,246,0.2);
+        }
+        .mode-card .mode-icon {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+        .mode-card .mode-name {
+            font-weight: 600;
+            font-size: 15px;
+            margin-bottom: 4px;
+        }
+        .mode-card .mode-desc {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        /* 组合选择 */
+        .combo-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        .combo-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 10px 14px;
+            background: var(--bg);
+            border: 2px solid var(--border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .combo-item:hover { border-color: var(--primary); }
+        .combo-item.selected {
+            border-color: var(--primary);
+            background: rgba(59,130,246,0.08);
+        }
+        .combo-item.disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+            pointer-events: none;
+        }
+        .combo-item input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--primary);
+        }
+        .combo-item .combo-name {
+            flex: 1;
+            font-weight: 500;
+        }
+        .combo-item .combo-odds {
+            font-size: 12px;
+            color: var(--text-secondary);
+            background: var(--card);
+            padding: 3px 8px;
+            border-radius: 10px;
+        }
+
+        /* 金额输入行 */
+        .amount-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px;
+            background: var(--bg);
+            border-radius: var(--radius-sm);
+            margin-bottom: 8px;
+            border: 1px solid var(--border);
+        }
+        .amount-row .combo-label {
+            width: 60px;
+            font-weight: 600;
+            text-align: center;
+        }
+        .amount-row .odds-badge {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+        .odds-low { background: var(--warning-bg); color: var(--warning); }
+        .odds-high { background: var(--purple-bg); color: var(--purple); }
+        .amount-row input {
+            flex: 1;
+            padding: 8px 12px;
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            font-size: 14px;
+            font-family: inherit;
+            text-align: center;
+        }
+        .amount-row input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+        .amount-row input.calculated {
+            background: rgba(59,130,246,0.08);
+            border-color: var(--primary);
+        }
+
+        /* 极值选择 */
+        .extreme-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+        .extreme-item {
+            padding: 10px 16px;
+            background: var(--bg);
+            border: 2px solid var(--border);
+            border-radius: var(--radius-sm);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 600;
+            font-size: 14px;
+            text-align: center;
+            min-width: 55px;
+        }
+        .extreme-item:hover { border-color: var(--primary); }
+        .extreme-item.selected {
+            border-color: var(--primary);
+            background: rgba(59,130,246,0.12);
+            color: var(--primary);
+        }
+
+        /* 日志区 */
+        .log-area {
+            background: #0a0a0a;
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 14px;
+            max-height: 250px;
+            overflow-y: auto;
+            font-family: 'Cascadia Code', 'Consolas', monospace;
+            font-size: 12px;
+            line-height: 1.8;
+        }
+        .log-area .log-entry { color: var(--text-secondary); }
+        .log-area .log-success { color: var(--success); }
+        .log-area .log-error { color: var(--danger); }
+        .log-area .log-info { color: var(--primary); }
+        .log-area .log-warning { color: var(--warning); }
+
+        /* 状态标签 */
+        .tag {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .tag-success { background: var(--success-bg); color: var(--success); }
+        .tag-danger { background: var(--danger-bg); color: var(--danger); }
+        .tag-warning { background: var(--warning-bg); color: var(--warning); }
+        .tag-purple { background: var(--purple-bg); color: var(--purple); }
+
+        /* 双列布局 */
+        .two-col {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        /* 隐藏 */
+        .hidden { display: none !important; }
+
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .mode-cards { grid-template-columns: 1fr; }
+            .two-col { grid-template-columns: 1fr; }
+            .combo-grid { grid-template-columns: 1fr; }
+            .steps { flex-direction: column; }
+            .step { border-right: none; border-bottom: 1px solid var(--border); }
+        }
+
+        /* 滚动条 */
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #4a5568; }
+
+        /* 提示 */
+        .tip {
+            font-size: 12px;
+            color: var(--text-secondary);
+            padding: 8px 12px;
+            background: var(--bg);
+            border-radius: var(--radius-sm);
+            border-left: 3px solid var(--primary);
+            margin-top: 8px;
+        }
+
+        .status-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 14px;
+            background: var(--bg);
+            border-radius: var(--radius-sm);
+            font-size: 13px;
+            margin-bottom: 16px;
+        }
+        .pulse {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+        .pulse.running { background: var(--success); }
+        .pulse.stopped { background: var(--text-secondary); }
+        @keyframes pulse {
+            0%,100% { opacity: 1; }
+            50% { opacity: 0.4; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 顶部导航 -->
+    <div class="topbar">
+        <div class="logo">🎰 PC28<span>控制台</span></div>
+        <div class="topbar-right">
+            <div class="account-indicator" id="accountIndicator">
+                <div class="dot" id="statusDot"></div>
+                <span id="statusText">未登录</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 主容器 -->
+    <div class="main-container">
+
+        <!-- 步骤指示器 -->
+        <div class="steps">
+            <div class="step active" id="step1" onclick="goToStep(1)">
+                <span class="step-num">1</span> 登录账号
+            </div>
+            <div class="step" id="step2" onclick="goToStep(2)">
+                <span class="step-num">2</span> 选择频道
+            </div>
+            <div class="step" id="step3" onclick="goToStep(3)">
+                <span class="step-num">3</span> 投注设置
+            </div>
+            <div class="step" id="step4" onclick="goToStep(4)">
+                <span class="step-num">4</span> 运行监控
+            </div>
+        </div>
+
+        <!-- ==================== 步骤1: 登录 ==================== -->
+        <div class="card" id="panel-step1">
+            <div class="card-title">
+                <span class="icon">🔐</span> 登录Telegram账号
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">手机号（含国际区号）</label>
+                <input type="text" class="form-input" id="phoneInput" 
+                       placeholder="例如: +8613800138000" value="+86">
+            </div>
+
+            <div id="codeSection" class="hidden">
+                <div class="form-group">
+                    <label class="form-label">验证码</label>
+                    <input type="text" class="form-input" id="codeInput" 
+                           placeholder="请输入收到的验证码" maxlength="5">
+                </div>
+            </div>
+
+            <div id="passwordSection" class="hidden">
+                <div class="form-group">
+                    <label class="form-label">两步验证密码</label>
+                    <input type="password" class="form-input" id="passwordInput" 
+                           placeholder="请输入两步验证密码">
+                </div>
+            </div>
+
+            <button class="btn btn-primary" id="btnLogin" onclick="handleLogin()">
+                📨 发送验证码
+            </button>
+
+            <div class="tip" id="loginTip" style="margin-top:12px;">
+                💡 登录后会自动保存会话，下次无需重新登录
+            </div>
+        </div>
+
+        <!-- ==================== 步骤2: 选择频道 ==================== -->
+        <div class="card hidden" id="panel-step2">
+            <div class="card-title">
+                <span class="icon">💬</span> 选择投注频道
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">已登录账号</label>
+                <select class="form-select" id="accountSelect" onchange="onAccountChange()">
+                    <option value="">-- 请先登录 --</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">投注频道</label>
+                <select class="form-select" id="channelSelect">
+                    <option value="">-- 请选择频道 --</option>
+                </select>
+                <button class="btn btn-outline btn-sm" style="margin-top:8px;" 
+                        onclick="refreshChannels()">🔄 刷新频道列表</button>
+            </div>
+
+            <button class="btn btn-primary" onclick="confirmChannel()" id="btnConfirmChannel" disabled>
+                ✅ 确认选择
+            </button>
+
+            <div class="tip">
+                💡 请选择你要发送投注消息的目标群组或频道
+            </div>
+        </div>
+
+        <!-- ==================== 步骤3: 投注设置 ==================== -->
+        <div class="card hidden" id="panel-step3">
+            <div class="card-title">
+                <span class="icon">🎯</span> 投注模式设置
+            </div>
+
+            <!-- 模式选择 -->
+            <div class="form-label" style="margin-bottom:10px;">选择投注模式</div>
+            <div class="mode-cards">
+                <div class="mode-card selected" id="modeKill" onclick="selectMode('kill')">
+                    <div class="mode-icon">🎯</div>
+                    <div class="mode-name">模式一：杀组</div>
+                    <div class="mode-desc">排除1个最不可能的组合<br>投注其余3个组合</div>
+                </div>
+                <div class="mode-card" id="modeABC" onclick="selectMode('abc')">
+                    <div class="mode-icon">🔮</div>
+                    <div class="mode-name">模式二：杀ABC球</div>
+                    <div class="mode-desc">预测ABC球号码<br>（模型待接入）</div>
+                </div>
+                <div class="mode-card" id="modeExtreme" onclick="selectMode('extreme')">
+                    <div class="mode-icon">🎪</div>
+                    <div class="mode-name">模式三：追极值</div>
+                    <div class="mode-desc">追踪特定极值号码<br>0-1-2-3-4 / 23-24-25-26-27</div>
+                </div>
+            </div>
+
+            <!-- 模式一：杀组设置 -->
+            <div id="settings-kill">
+                <div class="form-label" style="margin-bottom:10px;">
+                    选择要杀的组合 <span class="tag tag-purple">自动使用100期内胜率最高的模型</span>
+                </div>
+                <div class="combo-grid">
+                    <div class="combo-item selected" id="killCombo-大单" onclick="toggleKillCombo('大单')">
+                        <input type="checkbox" checked disabled> 
+                        <span class="combo-name">大单</span>
+                        <span class="combo-odds">赔率 4.32</span>
+                    </div>
+                    <div class="combo-item selected" id="killCombo-小单" onclick="toggleKillCombo('小单')">
+                        <input type="checkbox" checked disabled> 
+                        <span class="combo-name">小单</span>
+                        <span class="combo-odds">赔率 3.71</span>
+                    </div>
+                    <div class="combo-item selected" id="killCombo-大双" onclick="toggleKillCombo('大双')">
+                        <input type="checkbox" checked disabled> 
+                        <span class="combo-name">大双</span>
+                        <span class="combo-odds">赔率 3.71</span>
+                    </div>
+                    <div class="combo-item disabled" id="killCombo-小双" onclick="toggleKillCombo('小双')">
+                        <input type="checkbox" disabled> 
+                        <span class="combo-name">小双</span>
+                        <span class="combo-odds">赔率 4.32</span>
+                    </div>
+                </div>
+                <div class="tip" id="killTip" style="margin-top:10px;">
+                    📌 当前将杀掉 <strong id="killTarget">小双</strong>，投注大单、小单、大双<br>
+                    <span style="color:var(--warning);">⚠ 模型待接入，当前使用默认杀组</span>
+                </div>
+
+                <!-- 金额设置 -->
+                <div class="form-label" style="margin-top:20px; margin-bottom:10px;">
+                    设置投注金额（输入任意一项自动计算其余）
+                </div>
+                <div id="amountInputs">
+                    <!-- 动态生成 -->
+                </div>
+            </div>
+
+            <!-- 模式三：追极值设置 -->
+            <div id="settings-extreme" class="hidden">
+                <div class="form-label" style="margin-bottom:10px;">选择要追的极值号码</div>
+                <div class="extreme-grid" id="extremeGrid">
+                    <!-- 动态生成 0,1,2,3,4,23,24,25,26,27 -->
+                </div>
+                <div class="form-group">
+                    <label class="form-label">每个极值投注金额</label>
+                    <input type="number" class="form-input" id="extremeAmount" 
+                           placeholder="每个号码投注金额" value="1000" min="1">
+                </div>
+            </div>
+
+            <!-- 模式二：杀ABC球（占位） -->
+            <div id="settings-abc" class="hidden">
+                <div class="tip" style="text-align:center; padding:30px;">
+                    🔮 杀ABC球模型待接入<br>
+                    <span style="color:var(--text-secondary);">请先使用模式一或模式三</span>
+                </div>
+            </div>
+
+            <!-- 通用设置 -->
+            <div class="two-col" style="margin-top:20px;">
+                <div class="form-group">
+                    <label class="form-label">倍投乘数</label>
+                    <input type="number" class="form-input" id="multiplierInput" 
+                           value="2.0" step="0.1" min="1.0" max="10.0">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">最大连输倍投次数</label>
+                    <input type="number" class="form-input" id="maxLossInput" 
+                           value="5" min="0" max="20">
+                </div>
+            </div>
+
+            <button class="btn btn-success" onclick="startBetting()" id="btnStartBetting">
+                🚀 开始自动投注
+            </button>
+        </div>
+
+        <!-- ==================== 步骤4: 运行监控 ==================== -->
+        <div class="card hidden" id="panel-step4">
+            <div class="card-title">
+                <span class="icon">📡</span> 运行监控
+                <span class="tag tag-success" id="runStatus">运行中</span>
+            </div>
+
+            <div class="status-bar">
+                <div class="pulse running" id="runPulse"></div>
+                <span id="runInfo">自动投注运行中...</span>
+            </div>
+
+            <div class="two-col">
+                <div>
+                    <div class="form-label">当前期号</div>
+                    <div style="font-size:24px; font-weight:700;" id="currentQihao">--</div>
+                </div>
+                <div>
+                    <div class="form-label">杀组目标</div>
+                    <div style="font-size:24px; font-weight:700; color:var(--danger);" id="currentKill">--</div>
+                </div>
+            </div>
+
+            <div style="margin-top:16px;">
+                <div class="form-label">下注内容预览</div>
+                <div style="background:var(--bg); padding:14px; border-radius:var(--radius-sm); 
+                            font-family:monospace; font-size:14px;" id="betPreview">
+                    等待中...
+                </div>
+            </div>
+
+            <div style="margin-top:16px;">
+                <div class="form-label">运行日志</div>
+                <div class="log-area" id="logArea">
+                    <div class="log-entry">🟢 系统就绪，等待投注信号...</div>
+                </div>
+            </div>
+
+            <button class="btn btn-danger" onclick="stopBetting()" style="margin-top:16px;">
+                🛑 停止自动投注
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        // ==================== 全局状态 ====================
+        const STATE = {
+            currentStep: 1,
+            isLoggedIn: false,
+            currentPhone: '',
+            phoneCodeHash: '',
+            accounts: {},           // {phone: {name, client, channels: []}}
+            selectedAccount: '',
+            selectedChannel: {id: '', name: ''},
+            betMode: 'kill',        // 'kill' | 'abc' | 'extreme'
+            killedCombo: '小双',    // 杀组模式下被杀的组合
+            selectedExtremes: [],   // 追极值选中的号码
+            isRunning: false,
+            
+            // 金额配置
+            amounts: {
+                '大单': 0,
+                '小单': 0,
+                '大双': 0,
+                '小双': 0,
+            },
+            
+            // 赔率信息
+            odds: {
+                '大单': {rate: 4.32, group: 'high'},
+                '小单': {rate: 3.71, group: 'low'},
+                '大双': {rate: 3.71, group: 'low'},
+                '小双': {rate: 4.32, group: 'high'},
+            },
+            
+            // 比例关系（基于你提供的规则）
+            ratioMap: {
+                // 选小单、大双、大单（杀小双）
+                '杀小双': {
+                    relations: { '小单': '小单', '大双': '小单', '大单': '小单×0.8588' },
+                    calc: function(inputCombo, value) {
+                        if (inputCombo === '小单') return { '小单': value, '大双': value, '大单': Math.round(value * 0.8588) };
+                        if (inputCombo === '大单') return { '小单': Math.round(value / 0.8588), '大双': Math.round(value / 0.8588), '大单': value };
+                        if (inputCombo === '大双') return { '小单': value, '大双': value, '大单': Math.round(value * 0.8588) };
+                    }
+                },
+                // 选小单、大双、小双（杀大单）
+                '杀大单': {
+                    relations: { '小单': '小单', '大双': '小单', '小双': '小单×0.8588' },
+                    calc: function(inputCombo, value) {
+                        if (inputCombo === '小单') return { '小单': value, '大双': value, '小双': Math.round(value * 0.8588) };
+                        if (inputCombo === '小双') return { '小单': Math.round(value / 0.8588), '大双': Math.round(value / 0.8588), '小双': value };
+                        if (inputCombo === '大双') return { '小单': value, '大双': value, '小双': Math.round(value * 0.8588) };
+                    }
+                },
+                // 选小单、小双、大单（杀大双）
+                '杀大双': {
+                    relations: { '小单': '小单', '小双': '小单×0.6974', '大单': '小单×0.6974' },
+                    calc: function(inputCombo, value) {
+                        if (inputCombo === '小单') return { '小单': value, '小双': Math.round(value * 0.6974), '大单': Math.round(value * 0.6974) };
+                        if (inputCombo === '小双') return { '小单': Math.round(value / 0.6974), '小双': value, '大单': value };
+                        if (inputCombo === '大单') return { '小单': Math.round(value / 0.6974), '小双': value, '大单': value };
+                    }
+                },
+                // 选大双、小双、大单（杀小单）
+                '杀小单': {
+                    relations: { '大双': '大双', '小双': '大双×0.6974', '大单': '大双×0.6974' },
+                    calc: function(inputCombo, value) {
+                        if (inputCombo === '大双') return { '大双': value, '小双': Math.round(value * 0.6974), '大单': Math.round(value * 0.6974) };
+                        if (inputCombo === '小双') return { '大双': Math.round(value / 0.6974), '小双': value, '大单': value };
+                        if (inputCombo === '大单') return { '大双': Math.round(value / 0.6974), '小双': value, '大单': value };
+                    }
+                },
+            },
+        };
+
+        const COMBOS = ['大单', '小单', '大双', '小双'];
+        const EXTREME_NUMBERS = [0, 1, 2, 3, 4, 23, 24, 25, 26, 27];
+
+        // ==================== 初始化 ====================
+        document.addEventListener('DOMContentLoaded', () => {
+            initExtremeGrid();
+            updateKillDisplay();
+            renderAmountInputs();
+            loadAccountsFromStorage();
+        });
+
+        // ==================== 步骤导航 ====================
+        function goToStep(step) {
+            if (step > STATE.currentStep && !canProceedToStep(step)) {
+                addLog('warning', `请先完成步骤 ${STATE.currentStep}`);
+                return;
+            }
+            STATE.currentStep = step;
+            updateStepUI();
+        }
+
+        function canProceedToStep(step) {
+            if (step >= 2 && !STATE.isLoggedIn) return false;
+            if (step >= 3 && !STATE.selectedChannel.id) return false;
+            return true;
+        }
+
+        function updateStepUI() {
+            // 更新步骤指示器
+            for (let i = 1; i <= 4; i++) {
+                const stepEl = document.getElementById('step' + i);
+                stepEl.classList.remove('active', 'done');
+                if (i < STATE.currentStep) stepEl.classList.add('done');
+                if (i === STATE.currentStep) stepEl.classList.add('active');
+            }
+
+            // 显示/隐藏面板
+            document.getElementById('panel-step1').classList.toggle('hidden', STATE.currentStep !== 1);
+            document.getElementById('panel-step2').classList.toggle('hidden', STATE.currentStep !== 2);
+            document.getElementById('panel-step3').classList.toggle('hidden', STATE.currentStep !== 3);
+            document.getElementById('panel-step4').classList.toggle('hidden', STATE.currentStep !== 4);
+
+            // 更新步骤2的账号列表
+            if (STATE.currentStep === 2) updateAccountSelect();
+        }
+
+        // ==================== 登录逻辑 ====================
+        async function handleLogin() {
+            const phone = document.getElementById('phoneInput').value.trim();
+            if (!phone || !phone.startsWith('+')) {
+                addLog('error', '请输入正确的手机号（含国际区号）');
+                return;
+            }
+
+            const btnLogin = document.getElementById('btnLogin');
+            const codeSection = document.getElementById('codeSection');
+            const passwordSection = document.getElementById('passwordSection');
+
+            // 判断当前登录阶段
+            if (!STATE.phoneCodeHash) {
+                // 第一阶段：发送验证码
+                btnLogin.disabled = true;
+                btnLogin.textContent = '⏳ 发送中...';
+                addLog('info', `正在向 ${phone} 发送验证码...`);
+
+                // 模拟API调用（实际应调用后端）
+                await sleep(1500);
+                
+                STATE.currentPhone = phone;
+                STATE.phoneCodeHash = 'mock_hash_' + Date.now();
+                codeSection.classList.remove('hidden');
+                btnLogin.textContent = '🔓 验证登录';
+                btnLogin.disabled = false;
+                document.getElementById('codeInput').focus();
+                addLog('success', '验证码已发送，请查收');
+                
+            } else if (!codeSection.classList.contains('hidden') && !passwordSection.classList.contains('hidden')) {
+                // 第三阶段：提交两步验证密码
+                const password = document.getElementById('passwordInput').value.trim();
+                if (!password) { addLog('error', '请输入两步验证密码'); return; }
+                
+                btnLogin.disabled = true;
+                btnLogin.textContent = '⏳ 验证中...';
+                await sleep(1000);
+                
+                await completeLogin(phone);
+                
+            } else {
+                // 第二阶段：提交验证码
+                const code = document.getElementById('codeInput').value.trim();
+                if (!code || code.length < 3) {
+                    addLog('error', '请输入验证码');
+                    return;
+                }
+
+                btnLogin.disabled = true;
+                btnLogin.textContent = '⏳ 验证中...';
+                addLog('info', '正在验证验证码...');
+                await sleep(1000);
+
+                // 模拟：部分账号需要两步验证
+                const needs2FA = Math.random() < 0.3;
+                if (needs2FA) {
+                    passwordSection.classList.remove('hidden');
+                    codeSection.classList.add('hidden');
+                    btnLogin.textContent = '🔒 提交密码';
+                    btnLogin.disabled = false;
+                    document.getElementById('passwordInput').focus();
+                    addLog('warning', '此账号需要两步验证，请输入密码');
+                } else {
+                    await completeLogin(phone);
+                }
+            }
+        }
+
+        async function completeLogin(phone) {
+            // 模拟登录成功
+            const accountName = '用户 ' + phone.slice(-4);
+            
+            if (!STATE.accounts[phone]) {
+                STATE.accounts[phone] = {
+                    phone: phone,
+                    name: accountName,
+                    channels: generateMockChannels(),
+                };
+            }
+
+            STATE.isLoggedIn = true;
+            STATE.selectedAccount = phone;
+            
+            // 更新UI
+            document.getElementById('statusDot').classList.add('online');
+            document.getElementById('statusText').textContent = accountName + ' · 已登录';
+            
+            // 重置登录表单
+            STATE.phoneCodeHash = '';
+            document.getElementById('codeSection').classList.add('hidden');
+            document.getElementById('passwordSection').classList.add('hidden');
+            document.getElementById('btnLogin').textContent = '📨 发送验证码';
+            document.getElementById('btnLogin').disabled = false;
+            document.getElementById('codeInput').value = '';
+            document.getElementById('passwordInput').value = '';
+
+            addLog('success', `✅ 登录成功：${accountName}`);
+            saveAccountsToStorage();
+            
+            // 自动跳转到步骤2
+            goToStep(2);
+        }
+
+        function generateMockChannels() {
+            return [
+                { id: '1001', name: '🏰 PC28 官方投注群' },
+                { id: '1002', name: '🎲 加拿大28 交流群' },
+                { id: '1003', name: '💰 28投注·VIP频道' },
+                { id: '1004', name: '🎯 预测交流·28专区' },
+            ];
+        }
+
+        // ==================== 频道选择 ====================
+        function updateAccountSelect() {
+            const select = document.getElementById('accountSelect');
+            select.innerHTML = '<option value="">-- 选择已登录账号 --</option>';
+            
+            for (const [phone, acc] of Object.entries(STATE.accounts)) {
+                const option = document.createElement('option');
+                option.value = phone;
+                option.textContent = acc.name + ' (' + phone + ')';
+                if (phone === STATE.selectedAccount) option.selected = true;
+                select.appendChild(option);
+            }
+
+            if (STATE.selectedAccount) {
+                updateChannelSelect();
+            }
+        }
+
+        function onAccountChange() {
+            STATE.selectedAccount = document.getElementById('accountSelect').value;
+            if (STATE.selectedAccount) {
+                updateChannelSelect();
+            }
+            checkChannelConfirm();
+        }
+
+        function updateChannelSelect() {
+            const select = document.getElementById('channelSelect');
+            select.innerHTML = '<option value="">-- 请选择频道 --</option>';
+            
+            const acc = STATE.accounts[STATE.selectedAccount];
+            if (acc && acc.channels) {
+                acc.channels.forEach(ch => {
+                    const option = document.createElement('option');
+                    option.value = JSON.stringify({id: ch.id, name: ch.name});
+                    option.textContent = ch.name;
+                    select.appendChild(option);
+                });
+            }
+        }
+
+        async function refreshChannels() {
+            if (!STATE.selectedAccount) {
+                addLog('error', '请先选择账号');
+                return;
+            }
+            addLog('info', '正在刷新频道列表...');
+            await sleep(800);
+            updateChannelSelect();
+            addLog('success', '频道列表已刷新');
+        }
+
+        function checkChannelConfirm() {
+            const channelVal = document.getElementById('channelSelect').value;
+            document.getElementById('btnConfirmChannel').disabled = !STATE.selectedAccount || !channelVal;
+        }
+
+        function confirmChannel() {
+            const channelVal = document.getElementById('channelSelect').value;
+            if (!channelVal) { addLog('error', '请选择频道'); return; }
+            
+            try {
+                STATE.selectedChannel = JSON.parse(channelVal);
+                addLog('success', `已选择频道：${STATE.selectedChannel.name}`);
+                goToStep(3);
+            } catch (e) {
+                addLog('error', '频道数据异常');
+            }
+        }
+
+        // 监听频道选择变化
+        document.addEventListener('change', (e) => {
+            if (e.target.id === 'channelSelect') checkChannelConfirm();
+        });
+
+        // ==================== 模式选择 ====================
+        function selectMode(mode) {
+            STATE.betMode = mode;
+            
+            document.getElementById('modeKill').classList.toggle('selected', mode === 'kill');
+            document.getElementById('modeABC').classList.toggle('selected', mode === 'abc');
+            document.getElementById('modeExtreme').classList.toggle('selected', mode === 'extreme');
+
+            document.getElementById('settings-kill').classList.toggle('hidden', mode !== 'kill');
+            document.getElementById('settings-abc').classList.toggle('hidden', mode !== 'abc');
+            document.getElementById('settings-extreme').classList.toggle('hidden', mode !== 'extreme');
+
+            if (mode === 'kill') renderAmountInputs();
+        }
+
+        // ==================== 杀组切换 ====================
+        function toggleKillCombo(combo) {
+            // 在杀组模式下，始终杀一个，其他三个用于投注
+            // 默认杀小双，可以切换
+            const allCombos = ['大单', '小单', '大双', '小双'];
+            
+            // 取消所有选中
+            allCombos.forEach(c => {
+                document.getElementById('killCombo-' + c).classList.add('selected');
+            });
+            
+            // 设置被杀目标
+            STATE.killedCombo = combo;
+            document.getElementById('killCombo-' + combo).classList.remove('selected');
+            document.getElementById('killCombo-' + combo).classList.add('disabled');
+            
+            updateKillDisplay();
+            renderAmountInputs();
+        }
+
+        function updateKillDisplay() {
+            document.getElementById('killTarget').textContent = STATE.killedCombo;
+            
+            // 更新所有组合的显示状态
+            COMBOS.forEach(c => {
+                const el = document.getElementById('killCombo-' + c);
+                if (c === STATE.killedCombo) {
+                    el.classList.add('disabled');
+                    el.querySelector('input').checked = false;
+                } else {
+                    el.classList.remove('disabled');
+                    el.classList.add('selected');
+                    el.querySelector('input').checked = true;
+                }
+            });
+
+            document.getElementById('killTip').innerHTML = `
+                📌 当前将杀掉 <strong id="killTarget">${STATE.killedCombo}</strong>，
+                投注 ${COMBOS.filter(c => c !== STATE.killedCombo).join('、')}<br>
+                <span style="color:var(--warning);">⚠ 模型待接入，当前使用默认杀组</span>
+            `;
+        }
+
+        // ==================== 金额计算 ====================
+        function renderAmountInputs() {
+            if (STATE.betMode !== 'kill') return;
+            
+            const bettingCombos = COMBOS.filter(c => c !== STATE.killedCombo);
+            const container = document.getElementById('amountInputs');
+            
+            const ratioKey = '杀' + STATE.killedCombo;
+            const ratioData = STATE.ratioMap[ratioKey];
+            
+            let html = '<div style="display:flex; gap:8px; margin-bottom:8px; font-size:12px; color:var(--text-secondary);">';
+            html += '<span style="width:80px;"></span>';
+            html += '<span style="flex:1; text-align:center;">金额</span>';
+            html += '<span style="width:60px; text-align:center;">赔率</span>';
+            html += '</div>';
+
+            bettingCombos.forEach(combo => {
+                const oddsInfo = STATE.odds[combo];
+                const isCalculated = STATE.amounts[combo] > 0;
+                html += `
+                <div class="amount-row">
+                    <span class="combo-label">${combo}</span>
+                    <span class="odds-badge ${oddsInfo.group === 'low' ? 'odds-low' : 'odds-high'}">
+                        ${oddsInfo.rate}
+                    </span>
+                    <input type="number" 
+                           class="${isCalculated ? 'calculated' : ''}"
+                           id="amount-${combo}"
+                           value="${STATE.amounts[combo] || ''}"
+                           placeholder="${combo}金额"
+                           oninput="onAmountInput('${combo}', this.value)"
+                           min="1">
+                </div>`;
+            });
+
+            html += '<div class="tip" style="margin-top:8px;">';
+            html += '💡 输入任意一个组合的金额，其余组合会根据赔率比例自动计算';
+            html += '</div>';
+
+            container.innerHTML = html;
+        }
+
+        function onAmountInput(changedCombo, value) {
+            if (!value || value <= 0) {
+                // 清空所有
+                COMBOS.forEach(c => STATE.amounts[c] = 0);
+                renderAmountInputs();
+                return;
+            }
+
+            const ratioKey = '杀' + STATE.killedCombo;
+            const ratioData = STATE.ratioMap[ratioKey];
+            
+            if (!ratioData) return;
+
+            const numValue = parseInt(value);
+            const results = ratioData.calc(changedCombo, numValue);
+
+            // 更新所有投注组合的金额
+            for (const [combo, amount] of Object.entries(results)) {
+                STATE.amounts[combo] = amount;
+            }
+            // 被杀组合金额为0
+            STATE.amounts[STATE.killedCombo] = 0;
+
+            renderAmountInputs();
+        }
+
+        // ==================== 极值设置 ====================
+        function initExtremeGrid() {
+            const grid = document.getElementById('extremeGrid');
+            EXTREME_NUMBERS.forEach(num => {
+                const item = document.createElement('div');
+                item.className = 'extreme-item';
+                item.textContent = num;
+                item.onclick = () => toggleExtreme(num, item);
+                item.id = 'extreme-' + num;
+                grid.appendChild(item);
+            });
+        }
+
+        function toggleExtreme(num, el) {
+            const idx = STATE.selectedExtremes.indexOf(num);
+            if (idx >= 0) {
+                STATE.selectedExtremes.splice(idx, 1);
+                el.classList.remove('selected');
+            } else {
+                STATE.selectedExtremes.push(num);
+                el.classList.add('selected');
+            }
+        }
+
+        // ==================== 开始/停止投注 ====================
+        async function startBetting() {
+            // 验证
+            if (!STATE.isLoggedIn) { addLog('error', '请先登录'); goToStep(1); return; }
+            if (!STATE.selectedChannel.id) { addLog('error', '请先选择频道'); goToStep(2); return; }
+
+            if (STATE.betMode === 'kill') {
+                const bettingCombos = COMBOS.filter(c => c !== STATE.killedCombo);
+                const hasAmount = bettingCombos.some(c => STATE.amounts[c] > 0);
+                if (!hasAmount) {
+                    addLog('error', '请至少输入一个组合的投注金额');
+                    return;
+                }
+            }
+
+            if (STATE.betMode === 'extreme' && STATE.selectedExtremes.length === 0) {
+                addLog('error', '请至少选择一个极值号码');
+                return;
+            }
+
+            STATE.isRunning = true;
+            goToStep(4);
+
+            document.getElementById('runStatus').textContent = '运行中';
+            document.getElementById('runStatus').className = 'tag tag-success';
+            document.getElementById('runPulse').className = 'pulse running';
+            
+            updateBetPreview();
+            addLog('success', '🚀 自动投注已启动！');
+            addLog('info', `投注模式：${STATE.betMode === 'kill' ? '杀组' : STATE.betMode === 'abc' ? '杀ABC球' : '追极值'}`);
+            addLog('info', `目标频道：${STATE.selectedChannel.name}`);
+
+            // 模拟定时投注
+            startMockBetting();
+        }
+
+        function stopBetting() {
+            STATE.isRunning = false;
+            document.getElementById('runStatus').textContent = '已停止';
+            document.getElementById('runStatus').className = 'tag tag-danger';
+            document.getElementById('runPulse').className = 'pulse stopped';
+            document.getElementById('runInfo').textContent = '自动投注已停止';
+            addLog('warning', '🛑 自动投注已停止');
+        }
+
+        function updateBetPreview() {
+            let preview = '';
+            
+            if (STATE.betMode === 'kill') {
+                const bettingCombos = COMBOS.filter(c => c !== STATE.killedCombo);
+                const parts = bettingCombos.map(c => `${c}${STATE.amounts[c]}`);
+                preview = parts.join(' ');
+            } else if (STATE.betMode === 'extreme') {
+                const amount = document.getElementById('extremeAmount').value || 1000;
+                preview = STATE.selectedExtremes.map(n => `${n}/${amount}`).join('\n');
+            }
+
+            document.getElementById('betPreview').textContent = preview || '等待配置...';
+            document.getElementById('currentKill').textContent = STATE.killedCombo;
+        }
+
+        // 模拟投注循环
+        function startMockBetting() {
+            if (!STATE.isRunning) return;
+
+            const qihao = '20240516' + String(Math.floor(Math.random() * 1000)).padStart(3, '0');
+            document.getElementById('currentQihao').textContent = qihao;
+            
+            updateBetPreview();
+            addLog('info', `📤 [${qihao}] 已发送投注到 ${STATE.selectedChannel.name}`);
+
+            if (STATE.isRunning) {
+                setTimeout(startMockBetting, 8000 + Math.random() * 4000);
+            }
+        }
+
+        // ==================== 日志 ====================
+        function addLog(type, message) {
+            const logArea = document.getElementById('logArea');
+            const time = new Date().toLocaleTimeString();
+            const cls = type === 'success' ? 'log-success' : 
+                        type === 'error' ? 'log-error' : 
+                        type === 'warning' ? 'log-warning' : 
+                        type === 'info' ? 'log-info' : 'log-entry';
+            logArea.innerHTML += `<div class="${cls}">[${time}] ${message}</div>`;
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+
+        // ==================== 存储 ====================
+        function saveAccountsToStorage() {
+            try {
+                const data = {};
+                for (const [phone, acc] of Object.entries(STATE.accounts)) {
+                    data[phone] = { phone: acc.phone, name: acc.name };
+                }
+                localStorage.setItem('pc28_accounts', JSON.stringify(data));
+            } catch(e) {}
+        }
+
+        function loadAccountsFromStorage() {
+            try {
+                const raw = localStorage.getItem('pc28_accounts');
+                if (raw) {
+                    const data = JSON.parse(raw);
+                    for (const [phone, accData] of Object.entries(data)) {
+                        STATE.accounts[phone] = {
+                            ...accData,
+                            channels: generateMockChannels(),
+                        };
+                    }
+                    // 如果有已保存的账号，标记为已登录
+                    const phones = Object.keys(STATE.accounts);
+                    if (phones.length > 0) {
+                        STATE.isLoggedIn = true;
+                        STATE.selectedAccount = phones[0];
+                        document.getElementById('statusDot').classList.add('online');
+                        document.getElementById('statusText').textContent = 
+                            STATE.accounts[phones[0]].name + ' · 已登录';
+                    }
+                }
+            } catch(e) {}
+        }
+
+        // ==================== 工具 ====================
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+    </script>
+</body>
+</html>
