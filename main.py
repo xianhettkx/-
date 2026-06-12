@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""小鶴神 · 智投PC v6.2 - 珊宝"""
+"""小鶴神 · 智投PC v6.3 - Bot版倍投逻辑"""
 
 import asyncio, json, os, re, random, math
 from datetime import datetime
@@ -30,11 +30,10 @@ Config.STATIC_DIR.mkdir(exist_ok=True)
 Config.DATA_DIR.mkdir(exist_ok=True)
 Config.SESSIONS_DIR.mkdir(exist_ok=True)
 
-app = FastAPI(title="小鶴神 · 智投PC", version="6.2")
+app = FastAPI(title="小鶴神 · 智投PC", version="6.3")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# ==================== 1000模型ABC杀码 ====================
 KILL_MODELS = {}
 def create_advanced_predictor(depth, offset, weight, formula_type, step):
     def predictor(history_balls):
@@ -49,402 +48,378 @@ def create_advanced_predictor(depth, offset, weight, formula_type, step):
 random.seed(999)
 for ball in ["A", "B", "C"]:
     for i in range(1, 1001):
-        model_id = f"Elite_{ball}_{i:04d}"
-        depth = random.randint(3, 20); offset = random.randint(0, 19)
-        weight = random.uniform(0.1, 10.0); formula_type = random.randint(0, 2); step = random.randint(1, 3)
-        KILL_MODELS[model_id] = {"func": create_advanced_predictor(depth, offset, weight, formula_type, step), "ball": ball}
+        KILL_MODELS[f"Elite_{ball}_{i:04d}"] = {"func": create_advanced_predictor(random.randint(3,20), random.randint(0,19), random.uniform(0.1,10.0), random.randint(0,2), random.randint(1,3)), "ball": ball}
 
 class HighWinRateManager:
     @staticmethod
     def get_strict_prediction(history, ball_type):
-        ball_index = {"A": 0, "B": 1, "C": 2}[ball_type]
-        ball_history = [int(item["number"].split("+")[ball_index]) for item in history if "+" in item.get("number","")]
-        if not ball_history: return {"model_id": "N/A", "win_rate": 0, "kill_num": 0, "status": "数据不足", "bet_numbers": []}
-        target = {m: i for m, i in KILL_MODELS.items() if i["ball"] == ball_type}
-        rates = []
-        for mid, info in target.items():
-            w = sum(1 for i in range(min(100, len(ball_history)-1)) if ball_history[i] != info["func"](ball_history[i+1:]))
-            rates.append((mid, w/min(100, len(ball_history)-1), info["func"](ball_history)))
-        rates.sort(key=lambda x: x[1], reverse=True)
-        best = rates[0]
-        return {"model_id": best[0], "win_rate": best[1], "kill_num": best[2], "status": "信心充足" if best[1]>=0.92 else "盘面混乱", "bet_numbers": [n for n in range(10) if n != best[2]]}
-
+        bi = {"A":0,"B":1,"C":2}[ball_type]
+        bh = [int(item["number"].split("+")[bi]) for item in history if "+" in item.get("number","")]
+        if not bh: return {"model_id":"N/A","win_rate":0,"kill_num":0,"status":"数据不足","bet_numbers":[]}
+        t = {m:i for m,i in KILL_MODELS.items() if i["ball"]==ball_type}
+        r = []
+        for mid, info in t.items():
+            w = sum(1 for i in range(min(100,len(bh)-1)) if bh[i] != info["func"](bh[i+1:]))
+            r.append((mid, w/min(100,len(bh)-1), info["func"](bh)))
+        r.sort(key=lambda x: x[1], reverse=True)
+        b = r[0]
+        return {"model_id":b[0],"win_rate":b[1],"kill_num":b[2],"status":"信心充足" if b[1]>=0.92 else "盘面混乱","bet_numbers":[n for n in range(10) if n!=b[2]]}
     @classmethod
-    def get_all_predictions(cls, history):
-        return {b: cls.get_strict_prediction(history, b) for b in ["A", "B", "C"]}
+    def get_all_predictions(cls, h): return {b: cls.get_strict_prediction(h,b) for b in ["A","B","C"]}
 
 abc_manager = HighWinRateManager()
 
-# ==================== 杀组模型 ====================
 COMBOS = ["大单", "小单", "大双", "小双"]
 ALL_MODELS = {}
 
-def old_slayer_factory(history_data, cfg):
-    forms = ["大单", "小单", "大双", "小双"]
-    h_slice = [h.get("combo", h.get("combination", "小单")) for h in history_data[:cfg['depth']]]
-    counts = Counter(h_slice)
-    if cfg['type'] == "FREQ": target = max(forms, key=lambda x: counts.get(x, 0)) if cfg['bias'] == "HOT" else min(forms, key=lambda x: counts.get(x, 0))
-    elif cfg['type'] == "GAP":
-        last_idx = forms.index(h_slice[0]) if h_slice else 0; target = forms[(last_idx + cfg['offset']) % 4]
-    else: nbr = int(history_data[0].get('nbr', 0)) if history_data else 0; target = forms[(nbr * cfg['m'] + cfg['s']) % 4]
-    return [target]
+def old_slayer_factory(hd, cfg):
+    f = ["大单","小单","大双","小双"]
+    hs = [h.get("combo",h.get("combination","小单")) for h in hd[:cfg['depth']]]
+    c = Counter(hs)
+    if cfg['type']=="FREQ": t = max(f,key=lambda x:c.get(x,0)) if cfg['bias']=="HOT" else min(f,key=lambda x:c.get(x,0))
+    elif cfg['type']=="GAP": li = f.index(hs[0]) if hs else 0; t = f[(li+cfg['offset'])%4]
+    else: n = int(hd[0].get('nbr',0)) if hd else 0; t = f[(n*cfg['m']+cfg['s'])%4]
+    return [t]
 
-for i in range(1, 301):
-    cfg = {'depth': 10 + (i % 90), 'type': "FREQ" if i <= 100 else ("GAP" if i <= 200 else "MATH"), 'bias': "HOT" if i % 2 == 0 else "COLD", 'offset': (i * 7) % 4, 'm': (i * 13) % 17, 's': i % 5}
-    ALL_MODELS[i] = {"func": lambda h, c=cfg: old_slayer_factory(h, c), "info": {"id": i, "name": f"杀组 M{i}", "type": "杀组"}}
+for i in range(1,301):
+    c = {'depth':10+(i%90),'type':"FREQ" if i<=100 else ("GAP" if i<=200 else "MATH"),'bias':"HOT" if i%2==0 else "COLD",'offset':(i*7)%4,'m':(i*13)%17,'s':i%5}
+    ALL_MODELS[i] = {"func":lambda h,cc=c: old_slayer_factory(h,cc),"info":{"id":i,"name":f"杀组 M{i}","type":"杀组"}}
 
-NEW_FORMS = ["大单", "小单", "大双", "小双"]
-
-def slice_data_hist(hist_data, mode, depth):
-    h = [x.get("combo", x.get("combination", "小单")) for x in hist_data[-depth:]] if hist_data else []
-    if not h: return [random.choice(NEW_FORMS)]
-    if mode == 0: return h
-    elif mode == 1: return h[::-1]
-    elif mode == 2: return h[::2] if len(h)>=2 else h
-    elif mode == 3: return h[1::2] if len(h)>=2 else h
+NF = ["大单","小单","大双","小双"]
+def sdh(hd,m,d):
+    h = [x.get("combo",x.get("combination","小单")) for x in hd[-d:]] if hd else []
+    if not h: return [random.choice(NF)]
+    if m==0: return h
+    elif m==1: return h[::-1]
+    elif m==2: return h[::2] if len(h)>=2 else h
+    elif m==3: return h[1::2] if len(h)>=2 else h
     else: return h[len(h)//2:]
 
-def calc_feature(hist, ftype):
-    res = {f: 0 for f in NEW_FORMS}
-    if not hist: return res
-    if ftype == 0: [res.update({x: res.get(x,0)+1}) for x in hist]
-    elif ftype == 1:
-        last = {f: -1 for f in NEW_FORMS}
-        for i, x in enumerate(hist): last[x] = i
-        for f in NEW_FORMS: res[f] = len(hist) - last[f]
-    elif ftype == 2:
-        for i in range(1, len(hist)):
-            if hist[i] == hist[i-1]: res[hist[i]] = res.get(hist[i], 0) + 1
-    elif ftype == 3:
-        for i in range(1, len(hist)):
-            if hist[i] != hist[i-1]: res[hist[i]] = res.get(hist[i], 0) + 1
-    return res
+def cf(h,ft):
+    r = {f:0 for f in NF}
+    if not h: return r
+    if ft==0: [r.update({x:r.get(x,0)+1}) for x in h]
+    elif ft==1:
+        la = {f:-1 for f in NF}
+        for i,x in enumerate(h): la[x]=i
+        for f in NF: r[f]=len(h)-la[f]
+    elif ft==2:
+        for i in range(1,len(h)):
+            if h[i]==h[i-1]: r[h[i]]=r.get(h[i],0)+1
+    elif ft==3:
+        for i in range(1,len(h)):
+            if h[i]!=h[i-1]: r[h[i]]=r.get(h[i],0)+1
+    return r
 
-def new_kill_model(hist_data, cfg, mid):
-    data = slice_data_hist(hist_data, cfg["slice"], cfg["depth"]); feat = calc_feature(data, cfg["feature"])
-    scores = {}
-    for i, f in enumerate(NEW_FORMS):
-        base = feat[f]; noise = math.sin(mid * 0.31 + i) + math.cos(mid * 0.17 * (i+1)) + ((mid % 7) - 3) * 0.1
-        if cfg["mode"] == 0: score = base + noise
-        elif cfg["mode"] == 1: score = -base + noise
-        else: score = math.log(base + 1) + noise
-        scores[f] = score
-    return [min(scores, key=scores.get)]
+def nkm(hd,c,mid):
+    d = sdh(hd,c["slice"],c["depth"]); fe = cf(d,c["feature"])
+    sc = {}
+    for i,f in enumerate(NF):
+        ba = fe[f]; no = math.sin(mid*0.31+i)+math.cos(mid*0.17*(i+1))+((mid%7)-3)*0.1
+        if c["mode"]==0: sc[f]=ba+no
+        elif c["mode"]==1: sc[f]=-ba+no
+        else: sc[f]=math.log(ba+1)+no
+    return [min(sc,key=sc.get)]
 
-for i in range(1, 301):
-    mid = i + 300; cfg = {"depth": 10 + (i % 90), "slice": i % 5, "feature": i % 4, "mode": i % 3}
-    ALL_MODELS[mid] = {"func": lambda h, c=cfg, m=mid: new_kill_model(h, c, m), "info": {"id": mid, "name": f"新杀组 M{i}", "type": "杀组"}}
+for i in range(1,301):
+    mid=i+300; c={"depth":10+(i%90),"slice":i%5,"feature":i%4,"mode":i%3}
+    ALL_MODELS[mid]={"func":lambda h,cc=c,m=mid: nkm(h,cc,m),"info":{"id":mid,"name":f"新杀组 M{i}","type":"杀组"}}
 
-def new_kill_v3(history, mid):
-    forms = ["大单", "小单", "大双", "小双"]
-    h = [x.get("combo", x.get("combination", "小单")) for x in history[-30:]] if history else forms
-    counts = Counter(h); idx = mid % 5
-    if idx == 0: target = max(forms, key=lambda x: counts.get(x, 0))
-    elif idx == 1: target = min(forms, key=lambda x: counts.get(x, 0))
-    elif idx == 2: target = {"大单":"小双","小双":"大单","大双":"小单","小单":"大双"}.get(h[0] if h else "小单", "小单")
-    elif idx == 3: nbr = int(history[0].get('nbr', 0)) if history else 0; target = forms[nbr % 4]
-    else: total = sum(counts.values()) + 1; target = min(forms, key=lambda x: (counts.get(x,0)+1)/total)
-    return [target]
+def nkv3(h,mid):
+    f=["大单","小单","大双","小双"]
+    hh=[x.get("combo",x.get("combination","小单")) for x in h[-30:]] if h else f
+    c=Counter(hh); idx=mid%5
+    if idx==0: t=max(f,key=lambda x:c.get(x,0))
+    elif idx==1: t=min(f,key=lambda x:c.get(x,0))
+    elif idx==2: t={"大单":"小双","小双":"大单","大双":"小单","小单":"大双"}.get(hh[0] if hh else "小单","小单")
+    elif idx==3: n=int(h[0].get('nbr',0)) if h else 0; t=f[n%4]
+    else: total=sum(c.values())+1; t=min(f,key=lambda x:(c.get(x,0)+1)/total)
+    return [t]
 
-for i in range(1, 101):
-    mid = i + 600; ALL_MODELS[mid] = {"func": lambda h, m=mid: new_kill_v3(h, m), "info": {"id": mid, "name": f"V3杀组 M{i}", "type": "杀组"}}
+for i in range(1,101):
+    mid=i+600; ALL_MODELS[mid]={"func":lambda h,m=mid: nkv3(h,m),"info":{"id":mid,"name":f"V3杀组 M{i}","type":"杀组"}}
 
-def dynamic_matrix_slayer(history, cfg):
-    forms = ["大单", "小单", "大双", "小双"]
-    h_slice = [h.get("combination", h.get("combo", "小单")) for h in history[:cfg['depth']]]
-    if not h_slice: return ["小单"]
-    counts = {f: h_slice.count(f) for f in forms}
-    if cfg['type'] == "FREQ_BIAS": target = max(forms, key=lambda x: counts[x]) if cfg['bias'] == "HOT" else min(forms, key=lambda x: counts[x])
-    elif cfg['type'] == "GAP_SHIFT":
-        last_idx = forms.index(h_slice[0]) if h_slice[0] in forms else 0; target = forms[(last_idx + cfg['offset']) % 4]
-    else: nbr_seed = int(history[0].get('nbr', 0)) if str(history[0].get('nbr', '')).isdigit() else 1; target = forms[(nbr_seed * cfg['m'] + cfg['s']) % 4]
-    return [target]
+def dms(h,c):
+    f=["大单","小单","大双","小双"]
+    hs=[h.get("combination",h.get("combo","小单")) for h in h[:c['depth']]]
+    if not hs: return ["小单"]
+    cnt={f:hs.count(f) for f in f}
+    if c['type']=="FREQ_BIAS": t=max(f,key=lambda x:cnt[x]) if c['bias']=="HOT" else min(f,key=lambda x:cnt[x])
+    elif c['type']=="GAP_SHIFT": li=f.index(hs[0]) if hs[0] in f else 0; t=f[(li+c['offset'])%4]
+    else: ns=int(h[0].get('nbr',0)) if str(h[0].get('nbr','')).isdigit() else 1; t=f[(ns*c['m']+c['s'])%4]
+    return [t]
 
-for idx in range(1, 501):
-    model_id = 2000 + idx
-    if idx <= 180: cfg = {'type': "FREQ_BIAS", 'depth': 8 + (idx % 45), 'bias': "HOT" if (idx * 7) % 2 == 0 else "COLD", 'offset': 0, 'm': 0, 's': 0}
-    elif idx <= 360: cfg = {'type': "GAP_SHIFT", 'depth': 12 + (idx % 60), 'bias': "NONE", 'offset': (idx * 13) % 4, 'm': 0, 's': 0}
-    else: cfg = {'type': "MATH_WAVE", 'depth': 5 + (idx % 30), 'bias': "NONE", 'offset': 0, 'm': (idx * 17) % 23 + 1, 's': (idx * 3) % 7}
-    ALL_MODELS[model_id] = {"func": lambda h, c=cfg: dynamic_matrix_slayer(h, c), "info": {"id": model_id, "name": f"黄金矩阵杀组 M{model_id}", "type": "杀组"}}
+for idx in range(1,501):
+    mid=2000+idx
+    if idx<=180: c={'type':"FREQ_BIAS",'depth':8+(idx%45),'bias':"HOT" if (idx*7)%2==0 else "COLD",'offset':0,'m':0,'s':0}
+    elif idx<=360: c={'type':"GAP_SHIFT",'depth':12+(idx%60),'bias':"NONE",'offset':(idx*13)%4,'m':0,'s':0}
+    else: c={'type':"MATH_WAVE",'depth':5+(idx%30),'bias':"NONE",'offset':0,'m':(idx*17)%23+1,'s':(idx*3)%7}
+    ALL_MODELS[mid]={"func":lambda h,cc=c: dms(h,cc),"info":{"id":mid,"name":f"黄金矩阵杀组 M{mid}","type":"杀组"}}
 
 class ModelManager:
-    def __init__(self):
-        self.all_models = ALL_MODELS
-        self.kill_model_ids = [i for i in range(1, 701)] + [i for i in range(2001, 2501)]
-    def find_best_kill_model(self, history):
-        if len(history) < 10: return "小双", 0, 0
-        results = []; total = min(100, len(history) - 1)
-        for mid in self.kill_model_ids:
-            md = self.all_models.get(mid)
+    def __init__(self): self.am=ALL_MODELS; self.km=[i for i in range(1,701)]+[i for i in range(2001,2501)]
+    def fbm(self,h):
+        if len(h)<10: return "小双",0,0
+        r=[]; t=min(100,len(h)-1)
+        for mid in self.km:
+            md=self.am.get(mid)
             if not md: continue
-            win = sum(1 for i in range(1, total) if (lambda p,a: a and a!=p[0])(md["func"](history[i:]), history[i-1].get("combo","")))
-            rate = win / total if total > 0 else 0; results.append((mid, rate, md["func"](history)[0]))
-        results.sort(key=lambda x: x[1], reverse=True)
-        top3 = results[:3] if len(results) >= 3 else results
-        best = random.choice(top3) if top3 else (0, 0, "小双")
-        return best[2], best[1], best[0]
+            w=sum(1 for i in range(1,t) if (lambda p,a: a and a!=p[0])(md["func"](h[i:]),h[i-1].get("combo","")))
+            rate=w/t if t>0 else 0; r.append((mid,rate,md["func"](h)[0]))
+        r.sort(key=lambda x:x[1],reverse=True)
+        top3=r[:3] if len(r)>=3 else r
+        best=random.choice(top3) if top3 else (0,0,"小双")
+        return best[2],best[1],best[0]
 
-model_manager = ModelManager()
+mm = ModelManager()
 
-class ConnectionManager:
-    def __init__(self):
-        self.connections: Dict[str, WebSocket] = {}
-        self.clients: Dict[str, TelegramClient] = {}
-        self.login_states: Dict[str, dict] = {}
-        self.betting_tasks: Dict[str, asyncio.Task] = {}
-    async def connect(self, ws, cid): await ws.accept(); self.connections[cid] = ws
-    def disconnect(self, cid): self.connections.pop(cid, None)
-    async def send(self, cid, data):
-        ws = self.connections.get(cid)
-        if ws:
-            try: await ws.send_json(data)
-            except: self.disconnect(cid)
-    def get_client(self, phone): return self.clients.get(phone)
-    def save_client(self, phone, client): self.clients[phone] = client
-    def remove_client(self, phone):
-        self.clients.pop(phone, None)
-        f = Config.SESSIONS_DIR / f"{phone.replace('+','')}.session"
+class CM:
+    def __init__(self): self.conn={}; self.cli={}; self.ls={}; self.bt={}
+    async def connect(self,w,c): await w.accept(); self.conn[c]=w
+    def disconnect(self,c): self.conn.pop(c,None)
+    async def send(self,c,d):
+        w=self.conn.get(c)
+        if w:
+            try: await w.send_json(d)
+            except: self.disconnect(c)
+    def gc(self,p): return self.cli.get(p)
+    def sc(self,p,c): self.cli[p]=c
+    def rc(self,p):
+        self.cli.pop(p,None)
+        f=Config.SESSIONS_DIR/f"{p.replace('+','')}.session"
         if f.exists(): f.unlink()
 
-manager = ConnectionManager()
+cm = CM()
 
-async def fetch_history(count=100):
+async def fh(count=100):
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(f"https://pc28.help/api/kj.json?nbr={count}", timeout=15) as resp:
-                data = await resp.json()
-                if data.get('message') == 'success':
-                    items = data.get('data', []); processed = []
+        async with aiohttp.ClientSession() as s:
+            async with s.get(f"https://pc28.help/api/kj.json?nbr={count}",timeout=15) as r:
+                d=await r.json()
+                if d.get('message')=='success':
+                    items=d.get('data',[]); p=[]
                     for item in items:
-                        qihao = str(item.get('nbr', '')).strip()
-                        if not qihao: continue
-                        number = item.get('number') or item.get('num')
-                        if not number: continue
-                        if isinstance(number, str) and '+' in number:
-                            parts = number.split('+')
-                            if len(parts) == 3: total = sum(int(p) for p in parts)
+                        q=str(item.get('nbr','')).strip()
+                        if not q: continue
+                        n=item.get('number') or item.get('num')
+                        if not n: continue
+                        if isinstance(n,str) and '+' in n:
+                            pts=n.split('+')
+                            if len(pts)==3: total=sum(int(x) for x in pts)
                             else: continue
                         else:
-                            try: total = int(number)
+                            try: total=int(n)
                             except: continue
-                        combo = item.get('combination', '')
-                        if combo and len(combo) >= 2: size, parity = combo[0], combo[1]
-                        else:
-                            size = "大" if total >= 14 else "小"; parity = "单" if total % 2 else "双"; combo = size + parity
-                        processed.append({'qihao': qihao, 'sum': total, 'combo': combo, 'nbr': qihao, 'number': number})
-                    processed.sort(key=lambda x: x.get('qihao', ''), reverse=True)
-                    return processed
+                        combo=item.get('combination','')
+                        if combo and len(combo)>=2: size,parity=combo[0],combo[1]
+                        else: size="大" if total>=14 else "小"; parity="单" if total%2 else "双"; combo=size+parity
+                        p.append({'qihao':q,'sum':total,'combo':combo,'nbr':q,'number':n})
+                    p.sort(key=lambda x:x.get('qihao',''),reverse=True)
+                    return p
     except: return []
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/",response_class=HTMLResponse)
 async def root():
-    f = Config.STATIC_DIR / "index.html"
+    f=Config.STATIC_DIR/"index.html"
     return f.read_text(encoding='utf-8') if f.exists() else HTMLResponse("<h1>小鶴神 · 智投PC</h1>")
 
 @app.get("/health")
-async def health(): return {"status": "ok"}
+async def health(): return {"status":"ok"}
 
-@app.websocket("/ws/{client_id}")
-async def ws_handler(websocket: WebSocket, client_id: str):
-    await manager.connect(websocket, client_id)
+@app.websocket("/ws/{cid}")
+async def ws_handler(ws: WebSocket, cid: str):
+    await cm.connect(ws,cid)
     try:
-        await manager.send(client_id, {"type": "connected"})
-        await check_saved_sessions(client_id)
+        await cm.send(cid,{"type":"connected"})
+        await css(cid)
         while True:
-            data = await websocket.receive_json(); t = data.get("type", "")
-            if t == "ping": await manager.send(client_id, {"type": "pong"})
-            elif t == "check_status": await check_saved_sessions(client_id); await handle_get_latest(client_id)
-            elif t == "send_code": await handle_send_code(client_id, data)
-            elif t == "verify_code": await handle_verify_code(client_id, data)
-            elif t == "verify_password": await handle_verify_password(client_id, data)
-            elif t == "get_channels": await handle_get_channels(client_id, data)
-            elif t == "logout": await handle_logout(client_id, data)
-            elif t == "get_latest": await handle_get_latest(client_id)
-            elif t == "get_prediction": await handle_get_prediction(client_id, data)
-            elif t == "start_betting": await handle_start_betting(client_id, data)
-            elif t == "stop_betting": await handle_stop_betting(client_id, data)
-    except WebSocketDisconnect: manager.disconnect(client_id)
+            d=await ws.receive_json(); t=d.get("type","")
+            if t=="ping": await cm.send(cid,{"type":"pong"})
+            elif t=="check_status": await css(cid); await hgl(cid)
+            elif t=="send_code": await hsc(cid,d)
+            elif t=="verify_code": await hvc(cid,d)
+            elif t=="verify_password": await hvp(cid,d)
+            elif t=="get_channels": await hgc(cid,d)
+            elif t=="logout": await hl(cid,d)
+            elif t=="get_latest": await hgl(cid)
+            elif t=="get_prediction": await hgp(cid,d)
+            elif t=="start_betting": await hsb(cid,d)
+            elif t=="stop_betting": await hst(cid,d)
+    except WebSocketDisconnect: cm.disconnect(cid)
 
-async def check_saved_sessions(client_id: str):
-    sessions = list(Config.SESSIONS_DIR.glob("*.session")); saved = []
+async def css(cid):
+    sessions=list(Config.SESSIONS_DIR.glob("*.session")); sv=[]
     for sf in sessions:
-        phone = "+" + sf.stem
+        ph="+"+sf.stem
         try:
-            client = TelegramClient(str(sf), Config.API_ID, Config.API_HASH); await client.connect()
-            if await client.is_user_authorized():
-                me = await client.get_me(); name = f"{me.first_name or ''} {me.last_name or ''}".strip() or phone
-                manager.save_client(phone, client); saved.append({"phone": phone, "name": name})
-            else: await client.disconnect()
+            cl=TelegramClient(str(sf),Config.API_ID,Config.API_HASH); await cl.connect()
+            if await cl.is_user_authorized():
+                me=await cl.get_me(); nm=f"{me.first_name or ''} {me.last_name or ''}".strip() or ph
+                cm.sc(ph,cl); sv.append({"phone":ph,"name":nm})
+            else: await cl.disconnect()
         except: pass
-    if saved: await manager.send(client_id, {"type": "saved_sessions", "accounts": saved})
+    if sv: await cm.send(cid,{"type":"saved_sessions","accounts":sv})
 
-async def handle_send_code(client_id, data):
-    phone = data.get("phone", "").strip()
-    if not re.match(r'^\+\d{7,15}$', phone): await manager.send(client_id, {"type": "send_code_result", "success": False, "error": "手机号格式不正确"}); return
+async def hsc(cid,d):
+    ph=d.get("phone","").strip()
+    if not re.match(r'^\+\d{7,15}$',ph): await cm.send(cid,{"type":"send_code_result","success":False,"error":"手机号格式不正确"}); return
     try:
-        sf = Config.SESSIONS_DIR / f"{phone.replace('+','')}.session"
-        client = TelegramClient(str(sf), Config.API_ID, Config.API_HASH); await client.connect()
-        if await client.is_user_authorized():
-            me = await client.get_me(); name = f"{me.first_name or ''} {me.last_name or ''}".strip() or phone
-            manager.save_client(phone, client); await manager.send(client_id, {"type": "send_code_result", "success": True, "already_logged_in": True, "phone": phone, "name": name}); return
-        result = await client.send_code_request(phone)
-        manager.login_states[client_id] = {"phone": phone, "phone_code_hash": result.phone_code_hash, "client": client}
-        await manager.send(client_id, {"type": "send_code_result", "success": True, "phone": phone})
-    except FloodWaitError as e: await manager.send(client_id, {"type": "send_code_result", "success": False, "error": f"请等待 {e.seconds} 秒"})
-    except Exception as e: await manager.send(client_id, {"type": "send_code_result", "success": False, "error": str(e)[:200]})
+        sf=Config.SESSIONS_DIR/f"{ph.replace('+','')}.session"
+        cl=TelegramClient(str(sf),Config.API_ID,Config.API_HASH); await cl.connect()
+        if await cl.is_user_authorized():
+            me=await cl.get_me(); nm=f"{me.first_name or ''} {me.last_name or ''}".strip() or ph
+            cm.sc(ph,cl); await cm.send(cid,{"type":"send_code_result","success":True,"already_logged_in":True,"phone":ph,"name":nm}); return
+        res=await cl.send_code_request(ph)
+        cm.ls[cid]={"phone":ph,"phone_code_hash":res.phone_code_hash,"client":cl}
+        await cm.send(cid,{"type":"send_code_result","success":True,"phone":ph})
+    except FloodWaitError as e: await cm.send(cid,{"type":"send_code_result","success":False,"error":f"请等待 {e.seconds} 秒"})
+    except Exception as e: await cm.send(cid,{"type":"send_code_result","success":False,"error":str(e)[:200]})
 
-async def handle_verify_code(client_id, data):
-    code = data.get("code", "").strip(); state = manager.login_states.get(client_id)
-    if not state: await manager.send(client_id, {"type": "verify_code_result", "success": False, "error": "请先发送验证码"}); return
+async def hvc(cid,d):
+    code=d.get("code","").strip(); st=cm.ls.get(cid)
+    if not st: await cm.send(cid,{"type":"verify_code_result","success":False,"error":"请先发送验证码"}); return
     try:
-        client = state["client"]; phone = state["phone"]
-        await client.sign_in(phone=phone, code=code, phone_code_hash=state["phone_code_hash"])
-        me = await client.get_me(); name = f"{me.first_name or ''} {me.last_name or ''}".strip() or phone
-        manager.save_client(phone, client); manager.login_states.pop(client_id, None)
-        await manager.send(client_id, {"type": "verify_code_result", "success": True, "phone": phone, "name": name})
-    except SessionPasswordNeededError: state["needs_2fa"] = True; await manager.send(client_id, {"type": "verify_code_result", "success": True, "need_password": True})
-    except PhoneCodeInvalidError: await manager.send(client_id, {"type": "verify_code_result", "success": False, "error": "验证码错误"})
-    except PhoneCodeExpiredError: await manager.send(client_id, {"type": "verify_code_result", "success": False, "error": "验证码已过期"})
-    except Exception as e: await manager.send(client_id, {"type": "verify_code_result", "success": False, "error": str(e)[:200]})
+        cl=st["client"]; ph=st["phone"]
+        await cl.sign_in(phone=ph,code=code,phone_code_hash=st["phone_code_hash"])
+        me=await cl.get_me(); nm=f"{me.first_name or ''} {me.last_name or ''}".strip() or ph
+        cm.sc(ph,cl); cm.ls.pop(cid,None)
+        await cm.send(cid,{"type":"verify_code_result","success":True,"phone":ph,"name":nm})
+    except SessionPasswordNeededError: st["needs_2fa"]=True; await cm.send(cid,{"type":"verify_code_result","success":True,"need_password":True})
+    except PhoneCodeInvalidError: await cm.send(cid,{"type":"verify_code_result","success":False,"error":"验证码错误"})
+    except PhoneCodeExpiredError: await cm.send(cid,{"type":"verify_code_result","success":False,"error":"验证码已过期"})
+    except Exception as e: await cm.send(cid,{"type":"verify_code_result","success":False,"error":str(e)[:200]})
 
-async def handle_verify_password(client_id, data):
-    password = data.get("password", "").strip(); state = manager.login_states.get(client_id)
-    if not state: await manager.send(client_id, {"type": "verify_password_result", "success": False, "error": "登录状态已过期"}); return
+async def hvp(cid,d):
+    pw=d.get("password","").strip(); st=cm.ls.get(cid)
+    if not st: await cm.send(cid,{"type":"verify_password_result","success":False,"error":"登录状态已过期"}); return
     try:
-        client = state["client"]; phone = state["phone"]; await client.sign_in(password=password)
-        me = await client.get_me(); name = f"{me.first_name or ''} {me.last_name or ''}".strip() or phone
-        manager.save_client(phone, client); manager.login_states.pop(client_id, None)
-        await manager.send(client_id, {"type": "verify_password_result", "success": True, "phone": phone, "name": name})
-    except Exception as e: await manager.send(client_id, {"type": "verify_password_result", "success": False, "error": str(e)[:200]})
+        cl=st["client"]; ph=st["phone"]; await cl.sign_in(password=pw)
+        me=await cl.get_me(); nm=f"{me.first_name or ''} {me.last_name or ''}".strip() or ph
+        cm.sc(ph,cl); cm.ls.pop(cid,None)
+        await cm.send(cid,{"type":"verify_password_result","success":True,"phone":ph,"name":nm})
+    except Exception as e: await cm.send(cid,{"type":"verify_password_result","success":False,"error":str(e)[:200]})
 
-async def handle_get_channels(client_id, data):
-    phone = data.get("phone", ""); client = manager.get_client(phone)
-    if not client: await manager.send(client_id, {"type": "channels", "success": False, "error": "未登录"}); return
+async def hgc(cid,d):
+    ph=d.get("phone",""); cl=cm.gc(ph)
+    if not cl: await cm.send(cid,{"type":"channels","success":False,"error":"未登录"}); return
     try:
-        dialogs = await client.get_dialogs(limit=50)
-        groups = [{"id": str(d.id), "name": d.name[:50], "type": "channel" if d.is_channel else "group"} for d in dialogs if d.is_group or d.is_channel]
-        await manager.send(client_id, {"type": "channels", "success": True, "data": groups[:20]})
-    except Exception as e: await manager.send(client_id, {"type": "channels", "success": False, "error": str(e)[:200]})
+        dl=await cl.get_dialogs(limit=50)
+        g=[{"id":str(d.id),"name":d.name[:50],"type":"channel" if d.is_channel else "group"} for d in dl if d.is_group or d.is_channel]
+        await cm.send(cid,{"type":"channels","success":True,"data":g[:20]})
+    except Exception as e: await cm.send(cid,{"type":"channels","success":False,"error":str(e)[:200]})
 
-async def handle_logout(client_id, data):
-    phone = data.get("phone", ""); client = manager.get_client(phone)
-    if client:
-        try: await client.log_out(); await client.disconnect()
+async def hl(cid,d):
+    ph=d.get("phone",""); cl=cm.gc(ph)
+    if cl:
+        try: await cl.log_out(); await cl.disconnect()
         except: pass
-        manager.remove_client(phone)
-    await manager.send(client_id, {"type": "logout_result", "success": True})
+        cm.rc(ph)
+    await cm.send(cid,{"type":"logout_result","success":True})
 
-async def handle_get_latest(client_id):
-    history = await fetch_history(100)
-    if history:
-        latest = history[0]
-        await manager.send(client_id, {"type": "latest_data", "latest": {"qihao": latest['qihao'], "combo": latest['combo'], "sum": latest['sum'], "number": latest.get('number', '')}})
+async def hgl(cid):
+    h=await fh(100)
+    if h:
+        lt=h[0]
+        await cm.send(cid,{"type":"latest_data","latest":{"qihao":lt['qihao'],"combo":lt['combo'],"sum":lt['sum'],"number":lt.get('number','')}})
 
-async def handle_get_prediction(client_id, data):
-    mode = data.get("mode", "kill"); history = await fetch_history(100)
-    if not history or len(history) < 10: await manager.send(client_id, {"type": "prediction", "error": "数据不足"}); return
-    if mode == "kill":
-        kill_target, rate, model_id = model_manager.find_best_kill_model(history)
-        await manager.send(client_id, {"type": "prediction", "mode": "kill", "kill_target": kill_target, "win_rate": round(rate * 100, 1), "model_id": model_id, "latest_qihao": history[0]['qihao'], "latest_combo": history[0]['combo'], "latest_sum": history[0]['sum']})
-    elif mode == "abc":
-        results = abc_manager.get_all_predictions(history)
-        await manager.send(client_id, {"type": "prediction", "mode": "abc", "results": results, "latest_qihao": history[0]['qihao'], "latest_combo": history[0]['combo'], "latest_sum": history[0]['sum']})
+async def hgp(cid,d):
+    mode=d.get("mode","kill"); h=await fh(100)
+    if not h or len(h)<10: await cm.send(cid,{"type":"prediction","error":"数据不足"}); return
+    if mode=="kill":
+        kt,rate,mid=mm.fbm(h)
+        await cm.send(cid,{"type":"prediction","mode":"kill","kill_target":kt,"win_rate":round(rate*100,1),"model_id":mid,"latest_qihao":h[0]['qihao'],"latest_combo":h[0]['combo'],"latest_sum":h[0]['sum']})
+    elif mode=="abc":
+        res=abc_manager.get_all_predictions(h)
+        await cm.send(cid,{"type":"prediction","mode":"abc","results":res,"latest_qihao":h[0]['qihao'],"latest_combo":h[0]['combo'],"latest_sum":h[0]['sum']})
 
-async def handle_start_betting(client_id, data):
-    phone = data.get("phone", ""); channel_id = data.get("channel_id", "")
-    mode = data.get("mode", "kill"); config = data.get("config", {})
-    client = manager.get_client(phone)
-    if not client: await manager.send(client_id, {"type": "betting_started", "success": False, "error": "未登录"}); return
-    task_key = f"{phone}_{channel_id}"
-    if task_key in manager.betting_tasks: manager.betting_tasks[task_key].cancel()
-    task = asyncio.create_task(betting_loop(client_id, phone, int(channel_id), mode, config, client))
-    manager.betting_tasks[task_key] = task
-    await manager.send(client_id, {"type": "betting_started", "success": True})
+async def hsb(cid,d):
+    ph=d.get("phone",""); chid=d.get("channel_id","")
+    mode=d.get("mode","kill"); cfg=d.get("config",{})
+    cl=cm.gc(ph)
+    if not cl: await cm.send(cid,{"type":"betting_started","success":False,"error":"未登录"}); return
+    tk=f"{ph}_{chid}"
+    if tk in cm.bt: cm.bt[tk].cancel()
+    task=asyncio.create_task(bl(cid,ph,int(chid),mode,cfg,cl))
+    cm.bt[tk]=task
+    await cm.send(cid,{"type":"betting_started","success":True})
 
-# ==================== 核心投注循环（倍投修复） ====================
-async def betting_loop(client_id, phone, channel_id, mode, config, client):
-    prev_qihao = None
-    prev_killed = None
-    consecutive_losses = 0
-    multiplier = float(config.get("multiplier", 2.0))
-    max_losses = int(config.get("maxLoss", 5))
-    custom_tag = config.get("customTag", "")
+# ==================== Bot版倍投逻辑 ====================
+async def bl(cid,ph,chid,mode,cfg,cl):
+    last_qihao = None
+    last_killed = None
+    consec_losses = 0
+    mult = float(cfg.get("multiplier",2.0))
+    max_loss = int(cfg.get("maxLoss",5))
+    ctag = cfg.get("customTag","")
 
     try:
         while True:
-            history = await fetch_history(100)
-            if not history: await asyncio.sleep(5); continue
-            latest = history[0]; current_qihao = latest['qihao']
-            if current_qihao == prev_qihao: await asyncio.sleep(3); continue
+            h = await fh(100)
+            if not h: await asyncio.sleep(5); continue
+            latest = h[0]; cur_qihao = latest['qihao']
+            if cur_qihao == last_qihao: await asyncio.sleep(3); continue
 
-            # ===== 判断上一期输赢（在更新prev_qihao之前） =====
-            if prev_qihao is not None and prev_killed is not None:
-                last_actual = None
-                for h in history:
-                    if h.get('qihao') == prev_qihao:
-                        last_actual = h.get('combo', '')
-                        break
-                if last_actual:
-                    if last_actual == prev_killed:
-                        consecutive_losses += 1
-                        await manager.send(client_id, {"type": "bet_log", "message": f"❌ 输了！开:{last_actual}=杀:{prev_killed} 连输:{consecutive_losses}"})
-                    else:
-                        if consecutive_losses > 0:
-                            await manager.send(client_id, {"type": "bet_log", "message": f"✅ 赢了！开:{last_actual}≠杀:{prev_killed} 连输清零"})
-                        consecutive_losses = 0
+            # ===== Bot版判断上期输赢 =====
+            if last_qihao is not None and last_killed is not None and mode == "kill":
+                actual_combo = latest.get('combo','')
+                if actual_combo == last_killed:
+                    consec_losses += 1
+                    await cm.send(cid,{"type":"bet_log","message":f"❌ 输了！开:{actual_combo}=杀:{last_killed} 连输:{consec_losses}"})
                 else:
-                    await manager.send(client_id, {"type": "bet_log", "message": f"⚠ 未找到上期{prev_qihao}的开奖结果"})
+                    if consec_losses > 0:
+                        await cm.send(cid,{"type":"bet_log","message":f"✅ 赢了！开:{actual_combo}≠杀:{last_killed} 连输清零"})
+                    consec_losses = 0
 
-            if consecutive_losses > max_losses:
-                consecutive_losses = 0
-                await manager.send(client_id, {"type": "bet_log", "message": f"⚠ 达到最大倍投{max_losses}次，重置"})
+            if consec_losses > max_loss:
+                consec_losses = 0
+                await cm.send(cid,{"type":"bet_log","message":f"⚠ 达最大倍投{max_loss}次，重置"})
 
-            current_mult = multiplier ** consecutive_losses if consecutive_losses > 0 else 1.0
+            cur_mult = mult ** consec_losses if consec_losses > 0 else 1.0
 
-            await manager.send(client_id, {"type": "bet_log", "message": f"[{datetime.now().strftime('%H:%M:%S')}] 新期{current_qihao} {Config.BET_DELAY}s后 | 连输:{consecutive_losses} 倍率:{current_mult:.1f}x"})
+            await cm.send(cid,{"type":"bet_log","message":f"[{datetime.now().strftime('%H:%M:%S')}] 新期{cur_qihao} {Config.BET_DELAY}s后 | 连输:{consec_losses} 倍率:{cur_mult:.1f}x"})
             await asyncio.sleep(Config.BET_DELAY)
 
-            message = ""
+            # 更新期号
+            last_qihao = cur_qihao
+            msg = ""
+
             if mode == "kill":
-                kill_target, rate, _ = model_manager.find_best_kill_model(history)
-                prev_qihao = current_qihao
-                prev_killed = kill_target
+                kill_target, rate, _ = mm.fbm(h)
+                last_killed = kill_target
                 bet_combos = [c for c in COMBOS if c != kill_target]
-                parts = [f"{c}{int(config.get('amounts', {}).get(c, 10000) * current_mult)}" for c in bet_combos]
-                message = " ".join(parts)
-                await manager.send(client_id, {"type": "bet_log", "message": f"期:{current_qihao} 杀:{kill_target} 胜率:{rate*100:.1f}% 倍率:{current_mult:.1f}x"})
+                parts = [f"{c}{int(cfg.get('amounts',{}).get(c,10000)*cur_mult)}" for c in bet_combos]
+                msg = " ".join(parts)
+                await cm.send(cid,{"type":"bet_log","message":f"期:{cur_qihao} 杀:{kill_target} 胜率:{rate*100:.1f}% 倍率:{cur_mult:.1f}x"})
 
             elif mode == "abc":
-                preds = abc_manager.get_all_predictions(history)
-                balls = config.get("balls", ["A"]); amount = int(config.get("abcAmount", 1000) * current_mult)
+                preds = abc_manager.get_all_predictions(h)
+                balls = cfg.get("balls",["A"]); amt = int(cfg.get("abcAmount",1000)*cur_mult)
                 all_parts = []
                 for ball in balls:
-                    info = preds.get(ball, {}); bet_nums = info.get('bet_numbers', [])
-                    if bet_nums: all_parts.extend([f"{ball.lower()}{n}/{amount}" for n in bet_nums])
-                message = "\n".join(all_parts) if all_parts else ""
-                prev_qihao = current_qihao
+                    info = preds.get(ball,{}); bet_nums = info.get('bet_numbers',[])
+                    if bet_nums: all_parts.extend([f"{ball.lower()}{n}/{amt}" for n in bet_nums])
+                msg = "\n".join(all_parts) if all_parts else ""
 
             elif mode == "extreme":
-                extremes = config.get("extremeNumbers", []); amount = int(config.get("extremeAmount", 1000) * current_mult)
-                message = "\n".join([f"{n}/{amount}" for n in extremes])
-                prev_qihao = current_qihao
+                extremes = cfg.get("extremeNumbers",[]); amt = int(cfg.get("extremeAmount",1000)*cur_mult)
+                msg = "\n".join([f"{n}/{amt}" for n in extremes])
 
-            if custom_tag and message: message += "\n" + custom_tag
-            if message:
+            if ctag and msg: msg += "\n" + ctag
+            if msg:
                 try:
-                    await client.send_message(channel_id, message)
-                    await manager.send(client_id, {"type": "bet_log", "message": f"✅ 已发送 | 连输:{consecutive_losses}"})
+                    await cl.send_message(chid,msg)
+                    await cm.send(cid,{"type":"bet_log","message":f"✅ 已发送 | 连输:{consec_losses}"})
                 except FloodWaitError as e: await asyncio.sleep(e.seconds)
-                except Exception as e: await manager.send(client_id, {"type": "bet_log", "message": f"❌ {str(e)[:100]}", "error": True})
+                except Exception as e: await cm.send(cid,{"type":"bet_log","message":f"❌ {str(e)[:100]}","error":True})
             await asyncio.sleep(5)
     except asyncio.CancelledError: pass
 
-async def handle_stop_betting(client_id, data):
-    phone = data.get("phone", ""); channel_id = data.get("channel_id", "")
-    task_key = f"{phone}_{channel_id}"; task = manager.betting_tasks.get(task_key)
-    if task: task.cancel(); manager.betting_tasks.pop(task_key, None)
-    await manager.send(client_id, {"type": "betting_stopped", "success": True})
+async def hst(cid,d):
+    ph=d.get("phone",""); chid=d.get("channel_id","")
+    tk=f"{ph}_{chid}"; task=cm.bt.get(tk)
+    if task: task.cancel(); cm.bt.pop(tk,None)
+    await cm.send(cid,{"type":"betting_stopped","success":True})
 
-if __name__ == "__main__":
-    print("小鶴神 · 智投PC v6.2")
-    uvicorn.run(app, host=Config.HOST, port=Config.PORT)
+if __name__=="__main__":
+    print("小鶴神 · 智投PC v6.3")
+    uvicorn.run(app,host=Config.HOST,port=Config.PORT)
