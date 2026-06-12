@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""小鶴神 · 智投PC 后端服务 v4.1 - 倍投+自定义标签"""
+"""小鶴神 · 智投PC v5.0"""
 
 import asyncio, json, os, re, random, math
 from datetime import datetime
@@ -15,9 +15,8 @@ import uvicorn, aiohttp
 
 from telethon import TelegramClient
 from telethon.errors import SessionPasswordNeededError, PhoneCodeInvalidError, PhoneCodeExpiredError, FloodWaitError
-from abc_size_models import ABCSizeModelManager
+from abc_kill_models import ABCKillModelManager
 
-# ==================== 配置 ====================
 class Config:
     API_ID = 2040
     API_HASH = "b18441a1ff607e10a989891a5462e627"
@@ -32,11 +31,10 @@ Config.STATIC_DIR.mkdir(exist_ok=True)
 Config.DATA_DIR.mkdir(exist_ok=True)
 Config.SESSIONS_DIR.mkdir(exist_ok=True)
 
-app = FastAPI(title="小鶴神 · 智投PC", version="4.1")
+app = FastAPI(title="小鶴神 · 智投PC", version="5.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# ==================== 杀组模型 ====================
 COMBOS = ["大单", "小单", "大双", "小双"]
 ALL_MODELS = {}
 
@@ -150,7 +148,6 @@ for idx in range(1, 501):
         cfg = {'type': "MATH_WAVE", 'depth': 5 + (idx % 30), 'bias': "NONE", 'offset': 0, 'm': (idx * 17) % 23 + 1, 's': (idx * 3) % 7}
     ALL_MODELS[model_id] = {"func": lambda h, c=cfg: dynamic_matrix_slayer(h, c), "info": {"id": model_id, "name": f"黄金矩阵杀组 M{model_id}", "type": "杀组"}}
 
-# ==================== 模型管理器 ====================
 class ModelManager:
     def __init__(self):
         self.all_models = ALL_MODELS
@@ -178,9 +175,8 @@ class ModelManager:
         return best[2], best[1], best[0]
 
 model_manager = ModelManager()
-abc_size_manager = ABCSizeModelManager()
+abc_kill_manager = ABCKillModelManager()
 
-# ==================== 连接管理 ====================
 class ConnectionManager:
     def __init__(self):
         self.connections: Dict[str, WebSocket] = {}
@@ -204,7 +200,6 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
-# ==================== API ====================
 async def fetch_history(count=100):
     try:
         async with aiohttp.ClientSession() as session:
@@ -234,10 +229,10 @@ async def fetch_history(count=100):
                         processed.append({'qihao': qihao, 'sum': total, 'size': size, 'parity': parity, 'combo': combo, 'nbr': qihao, 'number': number})
                     processed.sort(key=lambda x: x.get('qihao', ''), reverse=True)
                     return processed
-    except Exception as e: print(f"获取历史数据失败: {e}")
+    except Exception as e:
+        print(f"获取失败: {e}")
     return []
 
-# ==================== 路由 ====================
 @app.get("/", response_class=HTMLResponse)
 async def root():
     f = Config.STATIC_DIR / "index.html"
@@ -247,22 +242,19 @@ async def root():
 async def health():
     history = await fetch_history(1)
     latest = history[0] if history else None
-    return {"status": "ok", "time": datetime.now().isoformat(), "latest": latest.get('qihao') if latest else 'N/A'}
+    return {"status": "ok", "latest": latest.get('qihao') if latest else 'N/A'}
 
-# ==================== WebSocket ====================
 @app.websocket("/ws/{client_id}")
 async def ws_handler(websocket: WebSocket, client_id: str):
     await manager.connect(websocket, client_id)
     try:
-        await manager.send(client_id, {"type": "connected", "message": "已连接小鶴神 · 智投PC"})
+        await manager.send(client_id, {"type": "connected"})
         await check_saved_sessions(client_id)
         while True:
             data = await websocket.receive_json()
             t = data.get("type", "")
             if t == "ping": await manager.send(client_id, {"type": "pong"})
-            elif t == "check_status":
-                await check_saved_sessions(client_id)
-                await handle_get_latest(client_id)
+            elif t == "check_status": await check_saved_sessions(client_id); await handle_get_latest(client_id)
             elif t == "send_code": await handle_send_code(client_id, data)
             elif t == "verify_code": await handle_verify_code(client_id, data)
             elif t == "verify_password": await handle_verify_password(client_id, data)
@@ -273,9 +265,7 @@ async def ws_handler(websocket: WebSocket, client_id: str):
             elif t == "start_betting": await handle_start_betting(client_id, data)
             elif t == "stop_betting": await handle_stop_betting(client_id, data)
     except WebSocketDisconnect: manager.disconnect(client_id)
-    except Exception as e: print(f"WS错误: {e}"); manager.disconnect(client_id)
 
-# ==================== 登录 ====================
 async def check_saved_sessions(client_id: str):
     sessions = list(Config.SESSIONS_DIR.glob("*.session"))
     saved = []
@@ -288,7 +278,7 @@ async def check_saved_sessions(client_id: str):
                 me = await client.get_me()
                 name = f"{me.first_name or ''} {me.last_name or ''}".strip() or phone
                 manager.save_client(phone, client)
-                saved.append({"phone": phone, "name": name, "user_id": me.id})
+                saved.append({"phone": phone, "name": name})
             else: await client.disconnect()
         except: pass
     if saved: await manager.send(client_id, {"type": "saved_sessions", "accounts": saved})
@@ -319,54 +309,43 @@ async def handle_send_code(client_id, data):
 async def handle_verify_code(client_id, data):
     code = data.get("code", "").strip()
     state = manager.login_states.get(client_id)
-    if not state:
-        await manager.send(client_id, {"type": "verify_code_result", "success": False, "error": "请先发送验证码"})
-        return
+    if not state: await manager.send(client_id, {"type": "verify_code_result", "success": False, "error": "请先发送验证码"}); return
     try:
         client = state["client"]; phone = state["phone"]
         await client.sign_in(phone=phone, code=code, phone_code_hash=state["phone_code_hash"])
         me = await client.get_me()
         name = f"{me.first_name or ''} {me.last_name or ''}".strip() or phone
         manager.save_client(phone, client); manager.login_states.pop(client_id, None)
-        await manager.send(client_id, {"type": "verify_code_result", "success": True, "phone": phone, "name": name, "user_id": me.id})
+        await manager.send(client_id, {"type": "verify_code_result", "success": True, "phone": phone, "name": name})
     except SessionPasswordNeededError:
         state["needs_2fa"] = True
         await manager.send(client_id, {"type": "verify_code_result", "success": True, "need_password": True})
-    except PhoneCodeInvalidError:
-        await manager.send(client_id, {"type": "verify_code_result", "success": False, "error": "验证码错误"})
-    except PhoneCodeExpiredError:
-        await manager.send(client_id, {"type": "verify_code_result", "success": False, "error": "验证码已过期"})
-    except Exception as e:
-        await manager.send(client_id, {"type": "verify_code_result", "success": False, "error": str(e)[:200]})
+    except PhoneCodeInvalidError: await manager.send(client_id, {"type": "verify_code_result", "success": False, "error": "验证码错误"})
+    except PhoneCodeExpiredError: await manager.send(client_id, {"type": "verify_code_result", "success": False, "error": "验证码已过期"})
+    except Exception as e: await manager.send(client_id, {"type": "verify_code_result", "success": False, "error": str(e)[:200]})
 
 async def handle_verify_password(client_id, data):
     password = data.get("password", "").strip()
     state = manager.login_states.get(client_id)
-    if not state:
-        await manager.send(client_id, {"type": "verify_password_result", "success": False, "error": "登录状态已过期"})
-        return
+    if not state: await manager.send(client_id, {"type": "verify_password_result", "success": False, "error": "登录状态已过期"}); return
     try:
         client = state["client"]; phone = state["phone"]
         await client.sign_in(password=password)
         me = await client.get_me()
         name = f"{me.first_name or ''} {me.last_name or ''}".strip() or phone
         manager.save_client(phone, client); manager.login_states.pop(client_id, None)
-        await manager.send(client_id, {"type": "verify_password_result", "success": True, "phone": phone, "name": name, "user_id": me.id})
-    except Exception as e:
-        await manager.send(client_id, {"type": "verify_password_result", "success": False, "error": str(e)[:200]})
+        await manager.send(client_id, {"type": "verify_password_result", "success": True, "phone": phone, "name": name})
+    except Exception as e: await manager.send(client_id, {"type": "verify_password_result", "success": False, "error": str(e)[:200]})
 
 async def handle_get_channels(client_id, data):
     phone = data.get("phone", "")
     client = manager.get_client(phone)
-    if not client:
-        await manager.send(client_id, {"type": "channels", "success": False, "error": "未登录"})
-        return
+    if not client: await manager.send(client_id, {"type": "channels", "success": False, "error": "未登录"}); return
     try:
         dialogs = await client.get_dialogs(limit=50)
         groups = [{"id": str(d.id), "name": d.name[:50], "type": "channel" if d.is_channel else "group"} for d in dialogs if d.is_group or d.is_channel]
         await manager.send(client_id, {"type": "channels", "success": True, "data": groups[:20]})
-    except Exception as e:
-        await manager.send(client_id, {"type": "channels", "success": False, "error": str(e)[:200]})
+    except Exception as e: await manager.send(client_id, {"type": "channels", "success": False, "error": str(e)[:200]})
 
 async def handle_logout(client_id, data):
     phone = data.get("phone", "")
@@ -375,7 +354,7 @@ async def handle_logout(client_id, data):
         try: await client.log_out(); await client.disconnect()
         except: pass
         manager.remove_client(phone)
-    await manager.send(client_id, {"type": "logout_result", "success": True, "phone": phone})
+    await manager.send(client_id, {"type": "logout_result", "success": True})
 
 async def handle_get_latest(client_id):
     history = await fetch_history(100)
@@ -386,24 +365,19 @@ async def handle_get_latest(client_id):
 async def handle_get_prediction(client_id, data):
     mode = data.get("mode", "kill")
     history = await fetch_history(100)
-    if not history or len(history) < 10:
-        await manager.send(client_id, {"type": "prediction", "error": "数据不足"})
-        return
+    if not history or len(history) < 10: await manager.send(client_id, {"type": "prediction", "error": "数据不足"}); return
     if mode == "kill":
         kill_target, rate, model_id = model_manager.find_best_kill_model(history)
         await manager.send(client_id, {"type": "prediction", "mode": "kill", "kill_target": kill_target, "win_rate": round(rate * 100, 1), "model_id": model_id, "latest_qihao": history[0]['qihao'], "latest_combo": history[0]['combo'], "latest_sum": history[0]['sum']})
     elif mode == "abc":
-        results = abc_size_manager.get_all_predictions(history)
+        results = abc_kill_manager.get_all_predictions(history)
         await manager.send(client_id, {"type": "prediction", "mode": "abc", "results": results, "latest_qihao": history[0]['qihao'], "latest_combo": history[0]['combo'], "latest_sum": history[0]['sum']})
 
-# ==================== 投注（含倍投+自定义标签） ====================
 async def handle_start_betting(client_id, data):
     phone = data.get("phone", ""); channel_id = data.get("channel_id", "")
     mode = data.get("mode", "kill"); config = data.get("config", {})
     client = manager.get_client(phone)
-    if not client:
-        await manager.send(client_id, {"type": "betting_started", "success": False, "error": "未登录"})
-        return
+    if not client: await manager.send(client_id, {"type": "betting_started", "success": False, "error": "未登录"}); return
     task_key = f"{phone}_{channel_id}"
     if task_key in manager.betting_tasks: manager.betting_tasks[task_key].cancel()
     task = asyncio.create_task(betting_loop(client_id, phone, int(channel_id), mode, config, client))
@@ -416,101 +390,53 @@ async def betting_loop(client_id, phone, channel_id, mode, config, client):
     multiplier = float(config.get("multiplier", 2.0))
     max_losses = int(config.get("maxLoss", 5))
     custom_tag = config.get("customTag", "")
-
     try:
         while True:
             history = await fetch_history(100)
             if not history: await asyncio.sleep(5); continue
             latest = history[0]; current_qihao = latest['qihao']
             if current_qihao == last_qihao: await asyncio.sleep(3); continue
-
-            # ===== 判断上一期输赢 =====
-            if last_qihao and len(history) >= 2:
-                last_actual = history[1].get('combo', '')
-                if mode == "kill" and 'last_killed' in config:
-                    if last_actual == config['last_killed']:
-                        consecutive_losses += 1
-                    else:
-                        consecutive_losses = 0
-                elif mode == "abc" and 'last_preds' in config:
-                    total = history[1].get('sum', 0)
-                    s = str(total).zfill(2)
-                    a_val = int(s[-2]) if len(s) >= 2 else 0
-                    b_val = int(s[-1])
-                    c_val = total % 10
-                    vals = {'A': a_val, 'B': b_val, 'C': c_val}
-                    lost = False
-                    for ball, info in config['last_preds'].items():
-                        actual_num = vals.get(ball, 0)
-                        actual_size = '大' if actual_num >= 5 else '小'
-                        if info.get('prediction', '小') != actual_size:
-                            lost = True; break
-                    if lost: consecutive_losses += 1
+            if last_qihao is not None:
+                last_actual = None
+                for h in history:
+                    if h.get('qihao') == last_qihao:
+                        last_actual = h.get('combo', ''); break
+                if last_actual and mode == "kill" and 'last_killed' in config:
+                    if last_actual == config['last_killed']: consecutive_losses += 1
                     else: consecutive_losses = 0
-
-            # 达到最大倍投次数，重置
-            if consecutive_losses > max_losses:
-                consecutive_losses = 0
-                await manager.send(client_id, {"type": "bet_log", "message": f"⚠ 达到最大倍投{max_losses}次，重置"})
-
+            if consecutive_losses > max_losses: consecutive_losses = 0
             current_mult = multiplier ** consecutive_losses if consecutive_losses > 0 else 1.0
-
-            await manager.send(client_id, {
-                "type": "bet_log",
-                "message": f"[{datetime.now().strftime('%H:%M:%S')}] 新期 {current_qihao} {Config.BET_DELAY}s后 | 连输:{consecutive_losses} 倍率:{current_mult:.1f}x"
-            })
+            await manager.send(client_id, {"type": "bet_log", "message": f"[{datetime.now().strftime('%H:%M:%S')}] 新期{current_qihao} {Config.BET_DELAY}s后 | 连输:{consecutive_losses} 倍率:{current_mult:.1f}x"})
             await asyncio.sleep(Config.BET_DELAY)
             last_qihao = current_qihao
             message = ""
-
             if mode == "kill":
                 kill_target, rate, model_id = model_manager.find_best_kill_model(history)
                 bet_combos = [c for c in COMBOS if c != kill_target]
                 parts = [f"{c}{int(config.get('amounts', {}).get(c, 10000) * current_mult)}" for c in bet_combos]
                 message = " ".join(parts)
                 config['last_killed'] = kill_target
-                await manager.send(client_id, {
-                    "type": "bet_log",
-                    "message": f"期:{current_qihao} 杀:{kill_target} 胜率:{rate*100:.1f}% 倍率:{current_mult:.1f}x"
-                })
-
             elif mode == "abc":
-                preds = abc_size_manager.get_all_predictions(history)
-                balls = config.get("balls", ["A"])
-                base_amount = config.get("abcAmount", 1000)
-                amount = int(base_amount * current_mult)
+                preds = abc_kill_manager.get_all_predictions(history)
+                balls = config.get("balls", ["A"]); amount = int(config.get("abcAmount", 1000) * current_mult)
                 all_parts = []
                 for ball in balls:
                     info = preds.get(ball, {})
-                    pred = info.get('prediction', '小')
-                    nums = [0,1,2,3,4] if pred == '小' else [5,6,7,8,9]
-                    all_parts.extend([f"{ball.lower()}{n}/{amount}" for n in nums])
+                    bet_nums = info.get('bet_numbers', list(range(10)))
+                    all_parts.extend([f"{ball.lower()}{n}/{amount}" for n in bet_nums])
                 message = "\n".join(all_parts)
-                config['last_preds'] = {b: preds[b] for b in balls}
-                await manager.send(client_id, {
-                    "type": "bet_log",
-                    "message": f"期:{current_qihao} " + ", ".join([f"{b}{preds[b]['prediction']}({preds[b]['win_rate']}%)" for b in balls]) + f" 倍率:{current_mult:.1f}x"
-                })
-
             elif mode == "extreme":
-                extremes = config.get("extremeNumbers", [])
-                base_amount = config.get("extremeAmount", 1000)
-                amount = int(base_amount * current_mult)
+                extremes = config.get("extremeNumbers", []); amount = int(config.get("extremeAmount", 1000) * current_mult)
                 message = "\n".join([f"{n}/{amount}" for n in extremes])
-
-            # 追加自定义标签
-            if custom_tag and message:
-                message += "\n" + custom_tag
-
+            if custom_tag and message: message += "\n" + custom_tag
             if message:
                 try:
                     await client.send_message(channel_id, message)
-                    await manager.send(client_id, {"type": "bet_log", "message": f"✅ 已发送 | 连输:{consecutive_losses} 倍率:{current_mult:.1f}x"})
+                    await manager.send(client_id, {"type": "bet_log", "message": f"✅ 已发送 | 连输:{consecutive_losses}"})
                 except FloodWaitError as e: await asyncio.sleep(e.seconds)
                 except Exception as e: await manager.send(client_id, {"type": "bet_log", "message": f"❌ {str(e)[:100]}", "error": True})
             await asyncio.sleep(5)
     except asyncio.CancelledError: pass
-    except Exception as e: await manager.send(client_id, {"type": "bet_log", "message": f"异常: {str(e)[:200]}", "error": True})
 
 async def handle_stop_betting(client_id, data):
     phone = data.get("phone", ""); channel_id = data.get("channel_id", "")
@@ -519,11 +445,6 @@ async def handle_stop_betting(client_id, data):
     if task: task.cancel(); manager.betting_tasks.pop(task_key, None)
     await manager.send(client_id, {"type": "betting_stopped", "success": True})
 
-# ==================== 启动 ====================
 if __name__ == "__main__":
-    print("=" * 50)
-    print("· 小鶴神 · 智投PC v4.1")
-    print(f"📡 http://{Config.HOST}:{Config.PORT}")
-    print(f"🧠 杀组:1201 | ABC大小:200 | 延迟:{Config.BET_DELAY}s | 倍投✅ | 自定义标签✅")
-    print("=" * 50)
+    print("🦅 小鶴神 · 智投PC v5.0")
     uvicorn.run(app, host=Config.HOST, port=Config.PORT)
