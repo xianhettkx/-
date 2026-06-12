@@ -491,5 +491,5 @@ async def handle_stop_betting(client_id, data):
     await manager.send(client_id, {"type": "betting_stopped", "success": True})
 
 if __name__ == "__main__":
-    print(·小鶴神 · 智投PC v5.1")
+    print("·小鶴神 · 智投PC v5.1")
     uvicorn.run(app, host=Config.HOST, port=Config.PORT)
