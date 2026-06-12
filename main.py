@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""小鶴神 · 智投PC v5.0"""
+"""小鶴神 · 智投PC v5.1 - 倍投修复"""
 
 import asyncio, json, os, re, random, math
 from datetime import datetime
@@ -31,7 +31,7 @@ Config.STATIC_DIR.mkdir(exist_ok=True)
 Config.DATA_DIR.mkdir(exist_ok=True)
 Config.SESSIONS_DIR.mkdir(exist_ok=True)
 
-app = FastAPI(title="小鶴神 · 智投PC", version="5.0")
+app = FastAPI(title="小鶴神 · 智投PC", version="5.1")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -240,9 +240,7 @@ async def root():
 
 @app.get("/health")
 async def health():
-    history = await fetch_history(1)
-    latest = history[0] if history else None
-    return {"status": "ok", "latest": latest.get('qihao') if latest else 'N/A'}
+    return {"status": "ok"}
 
 @app.websocket("/ws/{client_id}")
 async def ws_handler(websocket: WebSocket, client_id: str):
@@ -384,55 +382,102 @@ async def handle_start_betting(client_id, data):
     manager.betting_tasks[task_key] = task
     await manager.send(client_id, {"type": "betting_started", "success": True})
 
+# ==================== 核心投注循环（倍投修复版） ====================
 async def betting_loop(client_id, phone, channel_id, mode, config, client):
     last_qihao = None
     consecutive_losses = 0
     multiplier = float(config.get("multiplier", 2.0))
     max_losses = int(config.get("maxLoss", 5))
     custom_tag = config.get("customTag", "")
+
     try:
         while True:
             history = await fetch_history(100)
             if not history: await asyncio.sleep(5); continue
             latest = history[0]; current_qihao = latest['qihao']
             if current_qihao == last_qihao: await asyncio.sleep(3); continue
+
+            # ===== 判断上一期输赢 =====
             if last_qihao is not None:
-                last_actual = None
-                for h in history:
-                    if h.get('qihao') == last_qihao:
-                        last_actual = h.get('combo', ''); break
-                if last_actual and mode == "kill" and 'last_killed' in config:
-                    if last_actual == config['last_killed']: consecutive_losses += 1
-                    else: consecutive_losses = 0
-            if consecutive_losses > max_losses: consecutive_losses = 0
+                if mode == "kill" and 'last_killed' in config:
+                    # 找到上一期实际开奖
+                    last_actual = None
+                    for h in history:
+                        if h.get('qihao') == last_qihao:
+                            last_actual = h.get('combo', ''); break
+                    if last_actual:
+                        if last_actual == config['last_killed']:
+                            consecutive_losses += 1
+                            await manager.send(client_id, {"type": "bet_log", "message": f"❌ 上期输 开:{last_actual} 杀:{config['last_killed']} 连输:{consecutive_losses}"})
+                        else:
+                            consecutive_losses = 0
+                            await manager.send(client_id, {"type": "bet_log", "message": f"✅ 上期赢 开:{last_actual} 杀:{config['last_killed']} 连输清零"})
+
+                elif mode == "abc" and 'last_abc_kills' in config:
+                    last_number = None
+                    for h in history:
+                        if h.get('qihao') == last_qihao:
+                            last_number = h.get('number', ''); break
+                    if last_number and '+' in last_number:
+                        actual_nums = [int(x) for x in last_number.split('+')]
+                        ball_map = {'A': 0, 'B': 1, 'C': 2}
+                        lost = False
+                        for ball, kill_num in config['last_abc_kills'].items():
+                            if actual_nums[ball_map.get(ball, 0)] == kill_num:
+                                lost = True
+                                await manager.send(client_id, {"type": "bet_log", "message": f"❌ {ball}球上期输 开:{actual_nums[ball_map[ball]]} 杀:{kill_num}"})
+                                break
+                        if lost: consecutive_losses += 1
+                        else: consecutive_losses = 0; await manager.send(client_id, {"type": "bet_log", "message": "✅ ABC球上期赢 连输清零"})
+
+            if consecutive_losses > max_losses:
+                consecutive_losses = 0
+                await manager.send(client_id, {"type": "bet_log", "message": f"⚠ 达到最大倍投{max_losses}次，重置"})
+
             current_mult = multiplier ** consecutive_losses if consecutive_losses > 0 else 1.0
+
             await manager.send(client_id, {"type": "bet_log", "message": f"[{datetime.now().strftime('%H:%M:%S')}] 新期{current_qihao} {Config.BET_DELAY}s后 | 连输:{consecutive_losses} 倍率:{current_mult:.1f}x"})
             await asyncio.sleep(Config.BET_DELAY)
             last_qihao = current_qihao
             message = ""
+
+            # ===== 杀组投注 =====
             if mode == "kill":
-                kill_target, rate, model_id = model_manager.find_best_kill_model(history)
+                kill_target = config.get('killedCombo', '小双')
+                _, rate, _ = model_manager.find_best_kill_model(history)
                 bet_combos = [c for c in COMBOS if c != kill_target]
                 parts = [f"{c}{int(config.get('amounts', {}).get(c, 10000) * current_mult)}" for c in bet_combos]
                 message = " ".join(parts)
                 config['last_killed'] = kill_target
+                await manager.send(client_id, {"type": "bet_log", "message": f"期:{current_qihao} 杀:{kill_target} 胜率:{rate*100:.1f}% 倍率:{current_mult:.1f}x"})
+
+            # ===== ABC球投注 =====
             elif mode == "abc":
                 preds = abc_kill_manager.get_all_predictions(history)
-                balls = config.get("balls", ["A"]); amount = int(config.get("abcAmount", 1000) * current_mult)
+                balls = config.get("balls", ["A"])
+                amount = int(config.get("abcAmount", 1000) * current_mult)
                 all_parts = []
                 for ball in balls:
                     info = preds.get(ball, {})
                     bet_nums = info.get('bet_numbers', list(range(10)))
                     all_parts.extend([f"{ball.lower()}{n}/{amount}" for n in bet_nums])
                 message = "\n".join(all_parts)
+                config['last_abc_kills'] = {b: preds[b]['kill_num'] for b in balls}
+                await manager.send(client_id, {"type": "bet_log", "message": f"期:{current_qihao} " + ", ".join([f"{b}杀{preds[b]['kill_num']}({preds[b]['win_rate']*100:.1f}%)" for b in balls]) + f" 倍率:{current_mult:.1f}x"})
+
+            # ===== 追极值投注 =====
             elif mode == "extreme":
-                extremes = config.get("extremeNumbers", []); amount = int(config.get("extremeAmount", 1000) * current_mult)
+                extremes = config.get("extremeNumbers", [])
+                amount = int(config.get("extremeAmount", 1000) * current_mult)
                 message = "\n".join([f"{n}/{amount}" for n in extremes])
-            if custom_tag and message: message += "\n" + custom_tag
+
+            if custom_tag and message:
+                message += "\n" + custom_tag
+
             if message:
                 try:
                     await client.send_message(channel_id, message)
-                    await manager.send(client_id, {"type": "bet_log", "message": f"✅ 已发送 | 连输:{consecutive_losses}"})
+                    await manager.send(client_id, {"type": "bet_log", "message": f"✅ 已发送 | 连输:{consecutive_losses} 倍率:{current_mult:.1f}x"})
                 except FloodWaitError as e: await asyncio.sleep(e.seconds)
                 except Exception as e: await manager.send(client_id, {"type": "bet_log", "message": f"❌ {str(e)[:100]}", "error": True})
             await asyncio.sleep(5)
@@ -446,5 +491,5 @@ async def handle_stop_betting(client_id, data):
     await manager.send(client_id, {"type": "betting_stopped", "success": True})
 
 if __name__ == "__main__":
-    print("🦅 小鶴神 · 智投PC v5.0")
+    print(·小鶴神 · 智投PC v5.1")
     uvicorn.run(app, host=Config.HOST, port=Config.PORT)
