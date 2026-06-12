@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>小鶴神 · 模型智投PC</title>
+    <title>小鶴神 · 模型智投</title>
     <style>
         :root{--bg:#0a0e17;--card:#141b24;--border:#1e2d3d;--text:#e0e6ed;--text2:#8899aa;--pri:#3b82f6;--suc:#10b981;--sucb:rgba(16,185,129,.15);--dan:#ef4444;--danb:rgba(239,68,68,.15);--war:#f59e0b;--warb:rgba(245,158,11,.15);--pur:#8b5cf6;--purb:rgba(139,92,246,.15);--r:10px;--rs:6px}
         *{margin:0;padding:0;box-sizing:border-box}
@@ -80,7 +80,7 @@
 
 <div class="topbar">
     <button class="back-btn hidden" id="backBtn" onclick="goBack()">← 返回</button>
-    <div class="logo">小鶴神<span> · 智投PC</span></div>
+    <div class="logo">小鶴神<span> · 模型智投PC</span></div>
     <div class="acct"><div class="dot" id="statusDot"></div><span id="statusText">未登录</span></div>
 </div>
 
@@ -92,7 +92,6 @@
         <span style="font-size:11px;color:var(--text2)" id="latestSum"></span>
     </div>
 
-    <!-- 登录 -->
     <div class="card" id="panel-login">
         <div class="ct">🔐 登录Telegram</div>
         <div class="fg"><label class="fl">手机号</label><input type="tel" class="fi" id="phoneInput" placeholder="+8613800138000" value="+86"></div>
@@ -101,7 +100,6 @@
         <button class="btn bp" id="btnLogin" onclick="handleLogin()">📨 发送验证码</button>
     </div>
 
-    <!-- 频道 -->
     <div class="card hidden" id="panel-channels">
         <div class="ct">💬 选择频道</div>
         <div class="fg"><label class="fl">账号</label><select class="fs" id="accountSelect" onchange="onAccountChange()"></select></div>
@@ -110,12 +108,11 @@
         <button class="btn bp" onclick="confirmChannel()" id="btnConfirmChannel" disabled>✅ 确认</button>
     </div>
 
-    <!-- 设置 -->
     <div class="card hidden" id="panel-settings">
         <div class="ct">🎯 投注设置</div>
         <div class="mt">
             <div class="mtab act" onclick="switchMode('kill')" id="tab-kill">🎯 杀组</div>
-            <div class="mtab" onclick="switchMode('abc')" id="tab-abc">🔮 ABC大小</div>
+            <div class="mtab" onclick="switchMode('abc')" id="tab-abc">🔮 ABC杀码</div>
             <div class="mtab" onclick="switchMode('extreme')" id="tab-extreme">🎪 追极值</div>
         </div>
         <div id="planSection" class="fg">
@@ -155,12 +152,11 @@
             <label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:6px">
                 <input type="checkbox" id="customTagOn" onchange="document.getElementById('customTag').classList.toggle('hidden',!this.checked)"> 启用自定义尾缀
             </label>
-            <input type="text" class="fi hidden" id="customTag" placeholder="输入尾缀文字，如：小鶴神nb" maxlength="30">
+            <input type="text" class="fi hidden" id="customTag" placeholder="输入尾缀文字" maxlength="30">
         </div>
         <button class="btn bs" onclick="startBetting()">🚀 开始自动投注</button>
     </div>
 
-    <!-- 运行 -->
     <div class="card hidden" id="panel-running">
         <div class="ct">📡 运行中 <span class="tag ts" id="runStatus">Active</span></div>
         <div class="tc">
@@ -246,17 +242,24 @@ function hm(d){
             for(const[b,r]of Object.entries(d.results)){
                 h+=`<div class="wb" style="margin-bottom:6px">
                     <span style="font-weight:700">${b}球</span>
-                    <span>预测:</span><strong style="color:var(--pri);font-size:16px">${r.prediction}</strong>
-                    <span class="rate">${r.win_rate}%</span>
+                    <span>杀:</span><strong style="color:var(--dan);font-size:16px">${r.kill_num}</strong>
+                    <span class="rate">${(r.win_rate*100).toFixed(1)}%</span>
                     <span style="font-size:11px;color:var(--text2)">模型#${r.model_id}</span>
+                    ${r.status?('<span style="font-size:11px;color:var(--war)">'+r.status+'</span>'):''}
+                    <div style="font-size:11px;color:var(--text2)">投: ${(r.bet_numbers||[]).join(',')}</div>
                 </div>`;
             }
             document.getElementById('abcResults').innerHTML=h||'<div class="tip">点击刷新获取预测</div>';
         }
     }
-    else if(d.type==='betting_started'&&d.success){S.running=true;spn('running');ubp();log('success','🚀 已启动')}
-    else if(d.type==='betting_stopped'){S.running=false;log('warning','🛑 已停止')}
-    else if(d.type==='bet_log'){log(d.error?'error':'info',d.message)}
+    else if(d.type==='betting_started'&&d.success){S.running=true;spn('running');ubp();log('success','已启动')}
+    else if(d.type==='betting_stopped'){S.running=false;log('warning','已停止')}
+    else if(d.type==='bet_log'){
+        log(d.error?'error':'info', d.message);
+        var m=d.message||'';
+        var km=m.match(/杀:(.+?) /);if(km)document.getElementById('runKill').textContent=km[1];
+        var qm=m.match(/期:(\d+)/);if(qm)document.getElementById('runQihao').textContent=qm[1];
+    }
 }
 function hls(d){
     S.logged=true;S.phone=d.phone;
@@ -266,7 +269,7 @@ function hls(d){
     document.getElementById('codeSection').classList.add('hidden');
     document.getElementById('passwordSection').classList.add('hidden');
     document.getElementById('btnLogin').textContent='📨 发送验证码';document.getElementById('btnLogin').disabled=false;
-    log('success','✅ 登录成功：'+d.name);
+    log('success','登录成功：'+d.name);
     ws.send(JSON.stringify({type:'get_channels',phone:d.phone}));
     spn('channels');
 }
@@ -290,15 +293,15 @@ function handleLogin(){
     if(!document.getElementById('codeSection').classList.contains('hidden')){
         const cd=document.getElementById('codeInput').value.trim();
         if(!cd){log('error','请输入验证码');return}
-        btn.disabled=true;btn.textContent='⏳';
+        btn.disabled=true;btn.textContent='...';
         ws.send(JSON.stringify({type:'verify_code',code:cd}));
     }else if(!document.getElementById('passwordSection').classList.contains('hidden')){
         const pw=document.getElementById('passwordInput').value.trim();
         if(!pw){log('error','请输入密码');return}
-        btn.disabled=true;btn.textContent='⏳';
+        btn.disabled=true;btn.textContent='...';
         ws.send(JSON.stringify({type:'verify_password',password:pw}));
     }else{
-        btn.disabled=true;btn.textContent='⏳ 发送中...';
+        btn.disabled=true;btn.textContent='发送中...';
         ws.send(JSON.stringify({type:'send_code',phone:ph}));
     }
 }
@@ -342,15 +345,10 @@ function switchMode(m){
 
 function savePlan(){
     const n=prompt('方案名称:','方案'+(Object.keys(S.plans).length+1));
-    if(!n)return;
-    S.plans[n]={amts:{...S.amts}};
-    sp();upl();log('success','方案"'+n+'"已保存');
+    if(!n)return;S.plans[n]={amts:{...S.amts}};sp();upl();log('success','方案已保存');
 }
-function loadPlan(n){
-    const p=S.plans[n];if(!p)return;
-    S.amts={...p.amts};ucc();rai();log('info','已加载方案"'+n+'"');
-}
-function deletePlan(n){if(confirm('删除方案"'+n+'"?')){delete S.plans[n];sp();upl();log('warning','方案"'+n+'"已删除')}}
+function loadPlan(n){const p=S.plans[n];if(!p)return;S.amts={...p.amts};ucc();rai();log('info','已加载方案')}
+function deletePlan(n){if(confirm('删除?')){delete S.plans[n];sp();upl()}}
 function upl(){
     const e=document.getElementById('planList');
     const ns=Object.keys(S.plans);
@@ -361,14 +359,10 @@ function upl(){
 function ucc(){
     const e=document.getElementById('comboCards');
     e.innerHTML=C.map(c=>{
-        const k=c===S.killed;
-        const cl=k?'kill':'bet';
+        const k=c===S.killed,cl=k?'kill':'bet';
         const tg=k?'<span class="ctag tag td">已杀</span>':'<span class="ctag tag ts">投注</span>';
         const am=S.amts[c]||0;
-        return `<div class="cc ${cl}">
-            ${tg}<div class="cn">${c}</div><div class="co">赔率 ${S.odds[c].r}</div>
-            <div class="ca">${k?'跳过':(am>0?am+' KK':'未设置')}</div>
-        </div>`;
+        return `<div class="cc ${cl}">${tg}<div class="cn">${c}</div><div class="co">赔率 ${S.odds[c].r}</div><div class="ca">${k?'跳过':(am>0?am+' KK':'未设置')}</div></div>`;
     }).join('');
 }
 
@@ -376,45 +370,29 @@ function rai(){
     if(S.mode!=='kill')return;
     let h='';
     C.forEach(c=>{
-        const o=S.odds[c];
-        const k=c===S.killed;
-        h+=`<div class="ar">
-            <span class="cl" style="color:${k?'var(--dan)':'var(--text)'}">${c}</span>
-            <span class="ob ${o.g==='low'?'ol':'oh'}">${o.r}</span>
-            <input type="number" id="amt-${c}" value="${S.amts[c]||''}" placeholder="${k?'不投':'金额'}" oninput="oai('${c}',this.value)" inputmode="decimal">
-        </div>`;
+        const o=S.odds[c],k=c===S.killed;
+        h+=`<div class="ar"><span class="cl" style="color:${k?'var(--dan)':'var(--text)'}">${c}</span><span class="ob ${o.g==='low'?'ol':'oh'}">${o.r}</span><input type="number" id="amt-${c}" value="${S.amts[c]||''}" placeholder="${k?'不投':'金额'}" oninput="oai('${c}',this.value)" inputmode="decimal"></div>`;
     });
-    h+='<div class="tip">💡 提前设好4个组合的金额，模型自动选杀，用剩下3个的金额投注</div>';
+    h+='<div class="tip">提前设好4个组合的金额，模型自动选杀，用剩下3个投注</div>';
     document.getElementById('amountInputs').innerHTML=h;
 }
 function oai(c,v){S.amts[c]=parseInt(v)||0;ucc();sa()}
 
-function ie(){
-    const g=document.getElementById('extremeGrid');
-    EX.forEach(n=>{
-        const e=document.createElement('div');e.className='ei';e.textContent=n;
-        e.onclick=()=>{const i=S.exts.indexOf(n);if(i>=0){S.exts.splice(i,1);e.classList.remove('sel')}else{S.exts.push(n);e.classList.add('sel')}};
-        e.id='ex-'+n;g.appendChild(e);
-    });
-}
+function ie(){const g=document.getElementById('extremeGrid');EX.forEach(n=>{const e=document.createElement('div');e.className='ei';e.textContent=n;e.onclick=()=>{const i=S.exts.indexOf(n);if(i>=0){S.exts.splice(i,1);e.classList.remove('sel')}else{S.exts.push(n);e.classList.add('sel')}};e.id='ex-'+n;g.appendChild(e)});}
 
 function refreshPrediction(){
     if(!ws||ws.readyState!==1)return;
     if(S.mode==='kill')ws.send(JSON.stringify({type:'get_prediction',mode:'kill'}));
-    else if(S.mode==='abc'){
-        const b=[];if(document.getElementById('abcA').checked)b.push('A');if(document.getElementById('abcB').checked)b.push('B');if(document.getElementById('abcC').checked)b.push('C');
-        ws.send(JSON.stringify({type:'get_prediction',mode:'abc',balls:b}));
-    }
+    else if(S.mode==='abc'){const b=[];if(document.getElementById('abcA').checked)b.push('A');if(document.getElementById('abcB').checked)b.push('B');if(document.getElementById('abcC').checked)b.push('C');ws.send(JSON.stringify({type:'get_prediction',mode:'abc',balls:b}));}
 }
 function getLatest(){if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'get_latest'}))}
 
 function startBetting(){
     if(!S.logged){log('error','请先登录');spn('login');return}
     if(!S.selCh.id){log('error','请先选择频道');spn('channels');return}
-    if(S.mode==='kill'&&!C.some(c=>S.amts[c]>0)){log('error','请设置金额');return}
     const cf={mode:S.mode,killedCombo:S.killed,amounts:S.amts,extremeNumbers:S.exts,extremeAmount:parseInt(document.getElementById('extremeAmount')?.value||1000),abcAmount:parseInt(document.getElementById('abcAmount')?.value||1000),balls:[],multiplier:parseFloat(document.getElementById('multiplierInput').value),maxLoss:parseInt(document.getElementById('maxLossInput').value)};
     if(S.mode==='abc'){if(document.getElementById('abcA').checked)cf.balls.push('A');if(document.getElementById('abcB').checked)cf.balls.push('B');if(document.getElementById('abcC').checked)cf.balls.push('C')}
-    if(document.getElementById('customTagOn').checked){cf.customTag=document.getElementById('customTag').value.trim()}
+    if(document.getElementById('customTagOn').checked)cf.customTag=document.getElementById('customTag').value.trim();
     if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'start_betting',phone:S.selAcc,channel_id:S.selCh.id,mode:S.mode,config:cf}));
 }
 function stopBetting(){if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'stop_betting',phone:S.selAcc,channel_id:S.selCh.id}));S.running=false;document.getElementById('runStatus').textContent='已停止'}
@@ -422,16 +400,12 @@ function ubp(){
     let p='';
     if(S.mode==='kill')p=C.filter(c=>c!==S.killed).map(c=>c+S.amts[c]).join(' ');
     else if(S.mode==='extreme')p=S.exts.map(n=>n+'/'+(document.getElementById('extremeAmount')?.value||1000)).join('\n');
-    else if(S.mode==='abc'){const b=[];if(document.getElementById('abcA').checked)b.push('A');if(document.getElementById('abcB').checked)b.push('B');if(document.getElementById('abcC').checked)b.push('C');const amt=document.getElementById('abcAmount')?.value||1000;p=b.map(x=>x+'球: 预测大小→投5个号各'+amt).join('\n')}
+    else if(S.mode==='abc'){const b=[];if(document.getElementById('abcA').checked)b.push('A');if(document.getElementById('abcB').checked)b.push('B');if(document.getElementById('abcC').checked)b.push('C');const amt=document.getElementById('abcAmount')?.value||1000;p=b.map(x=>x+'球: 杀一码投9个号各'+amt).join('\n')}
     document.getElementById('betPreview').textContent=p||'--';
     document.getElementById('runKill').textContent=S.mode==='kill'?S.killed:'--';
 }
 
-function log(t,m){
-    const a=document.getElementById('logArea');
-    a.innerHTML+=`<div class="l${t==='success'?'s':t==='error'?'e':t==='warning'?'w':'i'}">[${new Date().toLocaleTimeString()}] ${m}</div>`;
-    a.scrollTop=a.scrollHeight;
-}
+function log(t,m){const a=document.getElementById('logArea');a.innerHTML+=`<div class="l${t==='success'?'s':t==='error'?'e':t==='warning'?'w':'i'}">[${new Date().toLocaleTimeString()}] ${m}</div>`;a.scrollTop=a.scrollHeight;}
 
 document.addEventListener('DOMContentLoaded',()=>{lp();la();cws();ie();setInterval(getLatest,30000)});
 </script>
