@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>小鶴神 · 模型智投PC</title>
+    <title>小鶴神 · 多模型智投PC</title>
     <style>
         :root{--bg:#0a0e17;--card:#141b24;--border:#1e2d3d;--text:#e0e6ed;--text2:#8899aa;--pri:#3b82f6;--suc:#10b981;--sucb:rgba(16,185,129,.15);--dan:#ef4444;--danb:rgba(239,68,68,.15);--war:#f59e0b;--warb:rgba(245,158,11,.15);--pur:#8b5cf6;--purb:rgba(139,92,246,.15);--r:10px;--rs:6px}
         *{margin:0;padding:0;box-sizing:border-box}
@@ -77,7 +77,7 @@
 
 <div class="topbar">
     <button class="back-btn hidden" id="backBtn" onclick="goBack()">← 返回</button>
-    <div class="logo">小鶴神<span> · 模型智投PC</span></div>
+    <div class="logo">小鶴神<span> · 多模型智投PC</span></div>
     <div class="acct"><div class="dot" id="statusDot"></div><span id="statusText">未登录</span></div>
 </div>
 
@@ -126,7 +126,7 @@
 </div>
 
 <script>
-const S={logged:false,phone:'',accounts:{},selAcc:'',selCh:{id:'',name:''},mode:'kill',killed:'小双',exts:[],running:false,hist:['login'],amts:{'大单':0,'小单':0,'大双':0,'小双':0},plans:{},odds:{'大单':{r:4.32,g:'high'},'小单':{r:3.71,g:'low'},'大双':{r:3.71,g:'low'},'小双':{r:4.32,g:'high'}}};
+const S={logged:false,phone:'',accounts:{},selAcc:'',selCh:{id:'',name:''},mode:'kill',killed:'',exts:[],running:false,hist:['login'],amts:{'大单':0,'小单':0,'大双':0,'小双':0},plans:{},odds:{'大单':{r:4.32,g:'high'},'小单':{r:3.71,g:'low'},'大双':{r:3.71,g:'low'},'小双':{r:4.32,g:'high'}}};
 const C=['大单','小单','大双','小双'];
 const EX=[0,1,2,3,4,23,24,25,26,27];
 
@@ -154,12 +154,32 @@ function hm(d){
     else if(d.type==='channels'&&d.success){const a=S.accounts[S.selAcc];if(a){a.channels=d.data;ucs();log('success',d.data.length+' 个群组')}}
     else if(d.type==='latest_data'&&d.latest){document.getElementById('latestQihao').textContent='期号: '+d.latest.qihao;document.getElementById('latestResult').textContent=d.latest.combo+' ('+d.latest.sum+')';document.getElementById('latestSum').textContent=d.latest.number||'';document.getElementById('latestResult').className='res '+(d.latest.sum>=14?'big':'small')}
     else if(d.type==='prediction'){
-        if(d.mode==='kill'){S.killed=d.kill_target;ucc();document.getElementById('killRate').textContent=d.win_rate+'%';document.getElementById('killModelInfo').textContent='模型#'+d.model_id;document.getElementById('killWinrate').style.display='flex';document.getElementById('latestQihao').textContent='期号: '+d.latest_qihao;document.getElementById('latestResult').textContent=d.latest_combo+' ('+d.latest_sum+')'}
+        if(d.mode==='kill'){
+            S.killed=d.kill_target;ucc();
+            document.getElementById('killRate').textContent=d.win_rate+'%';
+            document.getElementById('killModelInfo').textContent='模型#'+d.model_id;
+            document.getElementById('killWinrate').style.display='flex';
+            document.getElementById('latestQihao').textContent='期号: '+d.latest_qihao;
+            document.getElementById('latestResult').textContent=d.latest_combo+' ('+d.latest_sum+')';
+        }
         else if(d.mode==='abc'){let h='';for(const[b,r]of Object.entries(d.results)){h+=`<div class="wb" style="margin-bottom:6px"><span style="font-weight:700">${b}球</span><span>杀:</span><strong style="color:var(--dan);font-size:16px">${r.kill_num}</strong><span class="rate">${(r.win_rate*100).toFixed(1)}%</span><span style="font-size:11px;color:var(--text2)">模型#${r.model_id}</span>${r.status?('<span style="font-size:11px;color:var(--war)">'+r.status+'</span>'):''}<div style="font-size:11px;color:var(--text2)">投: ${(r.bet_numbers||[]).join(',')}</div></div>`}document.getElementById('abcResults').innerHTML=h||'<div class="tip">点击刷新获取预测</div>'}
     }
-    else if(d.type==='betting_started'&&d.success){S.running=true;spn('running');ubp();log('success','已启动')}
+    else if(d.type==='betting_started'&&d.success){S.running=true;spn('running');log('success','已启动')}
     else if(d.type==='betting_stopped'){S.running=false;log('warning','已停止')}
-    else if(d.type==='bet_log'){log(d.error?'error':'info',d.message);var m=d.message||'';var km=m.match(/杀:(.+?) /);if(km)document.getElementById('runKill').textContent=km[1];var qm=m.match(/期:(\d+)/);if(qm)document.getElementById('runQihao').textContent=qm[1]}
+    else if(d.type==='bet_log'){
+        log(d.error?'error':'info', d.message);
+        var m=d.message||'';
+        // 从后端日志提取实际杀的组合
+        var km=m.match(/杀:(.+?) /);
+        if(km){
+            S.killed=km[1];
+            document.getElementById('runKill').textContent=S.killed;
+        }
+        var qm=m.match(/期:(\d+)/);
+        if(qm)document.getElementById('runQihao').textContent=qm[1];
+        // 实时更新下注预览
+        if(m.indexOf('已发送')>=0 || m.indexOf('杀:')>=0) ubp();
+    }
 }
 function hls(d){S.logged=true;S.phone=d.phone;if(!S.accounts[d.phone])S.accounts[d.phone]={phone:d.phone,name:d.name,channels:[]};S.accounts[d.phone].name=d.name;S.selAcc=d.phone;ul(d.name);document.getElementById('codeSection').classList.add('hidden');document.getElementById('passwordSection').classList.add('hidden');document.getElementById('btnLogin').textContent='📨 发送验证码';document.getElementById('btnLogin').disabled=false;log('success','登录成功');ws.send(JSON.stringify({type:'get_channels',phone:d.phone}));spn('channels')}
 function ul(n){document.getElementById('statusDot').classList.add('on');document.getElementById('statusText').textContent=n+' · 已登录'}
@@ -196,7 +216,17 @@ function getLatest(){if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'get_
 
 function startBetting(){if(!S.logged){log('error','请先登录');spn('login');return}if(!S.selCh.id){log('error','请先选择频道');spn('channels');return}const cf={mode:S.mode,killedCombo:S.killed,amounts:S.amts,extremeNumbers:S.exts,extremeAmount:parseInt(document.getElementById('extremeAmount')?.value||1000),abcAmount:parseInt(document.getElementById('abcAmount')?.value||1000),balls:[],multiplier:parseFloat(document.getElementById('multiplierInput').value),maxLoss:parseInt(document.getElementById('maxLossInput').value)};if(S.mode==='abc'){if(document.getElementById('abcA').checked)cf.balls.push('A');if(document.getElementById('abcB').checked)cf.balls.push('B');if(document.getElementById('abcC').checked)cf.balls.push('C')}if(document.getElementById('customTagOn').checked)cf.customTag=document.getElementById('customTag').value.trim();if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'start_betting',phone:S.selAcc,channel_id:S.selCh.id,mode:S.mode,config:cf}))}
 function stopBetting(){if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'stop_betting',phone:S.selAcc,channel_id:S.selCh.id}));S.running=false;document.getElementById('runStatus').textContent='已停止'}
-function ubp(){let p='';if(S.mode==='kill')p=C.filter(c=>c!==S.killed).map(c=>c+S.amts[c]).join(' ');else if(S.mode==='extreme')p=S.exts.map(n=>n+'/'+(document.getElementById('extremeAmount')?.value||1000)).join('\n');else if(S.mode==='abc'){const b=[];if(document.getElementById('abcA').checked)b.push('A');if(document.getElementById('abcB').checked)b.push('B');if(document.getElementById('abcC').checked)b.push('C');const amt=document.getElementById('abcAmount')?.value||1000;p=b.map(x=>x+'球: 杀一码投9个号各'+amt).join('\n')}document.getElementById('betPreview').textContent=p||'--';document.getElementById('runKill').textContent=S.mode==='kill'?S.killed:'--'}
+
+function ubp(){
+    let p='';
+    if(S.mode==='kill'){
+        p=C.filter(function(c){return c!==S.killed}).map(function(c){return c+S.amts[c]}).join(' ');
+        document.getElementById('runKill').textContent=S.killed||'--';
+    }
+    else if(S.mode==='extreme')p=S.exts.map(function(n){return n+'/'+(document.getElementById('extremeAmount')?.value||1000)}).join('\n');
+    else if(S.mode==='abc'){const b=[];if(document.getElementById('abcA').checked)b.push('A');if(document.getElementById('abcB').checked)b.push('B');if(document.getElementById('abcC').checked)b.push('C');const amt=document.getElementById('abcAmount')?.value||1000;p=b.map(function(x){return x+'球: 杀一码投9个号各'+amt}).join('\n')}
+    document.getElementById('betPreview').textContent=p||'--';
+}
 
 function log(t,m){const a=document.getElementById('logArea');a.innerHTML+=`<div class="l${t==='success'?'s':t==='error'?'e':t==='warning'?'w':'i'}">[${new Date().toLocaleTimeString()}] ${m}</div>`;a.scrollTop=a.scrollHeight}
 
