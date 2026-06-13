@@ -34,7 +34,6 @@ app = FastAPI(title="小鶴神 · 智投PC", version="7.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# ==================== ABC杀码 ====================
 KILL_MODELS = {}
 def create_advanced_predictor(depth, offset, weight, formula_type, step):
     def predictor(history_balls):
@@ -70,7 +69,6 @@ class HighWinRateManager:
 
 abc_manager = HighWinRateManager()
 
-# ==================== 杀组模型 ====================
 COMBOS = ["大单", "小单", "大双", "小双"]
 ALL_MODELS = {}
 
@@ -337,7 +335,7 @@ async def hgp(cid,d):
 async def hsb(cid,d):
     ph=d.get("phone",""); chid=d.get("channel_id","")
     cfg=d.get("config",{})
-    modes=cfg.get("modes",["kill"])  # 支持多模式
+    modes=cfg.get("modes",["kill"])
     cl=cm.gc(ph)
     if not cl: await cm.send(cid,{"type":"betting_started","success":False,"error":"未登录"}); return
     tk=f"{ph}_{chid}"
@@ -377,7 +375,7 @@ async def bl(cid,ph,chid,modes,cfg,cl):
                 consec_losses = 0
                 await cm.send(cid,{"type":"bet_log","message":f"⚠ 达最大倍投{max_loss}次，重置"})
 
-            cur_mult = mult ** consec_losses if consec_losses > 0 else 1.0
+            cur_mult = mult ** consec_losses if (consec_losses > 0 and "kill" in modes) else 1.0
 
             await cm.send(cid,{"type":"bet_log","message":f"[{datetime.now().strftime('%H:%M:%S')}] 新期{cur_qihao} {Config.BET_DELAY}s后 | 连输:{consec_losses} 倍率:{cur_mult:.1f}x"})
             await asyncio.sleep(Config.BET_DELAY)
@@ -389,35 +387,38 @@ async def bl(cid,ph,chid,modes,cfg,cl):
             if "kill" in modes:
                 kill_target, rate, _ = mm.fbm(h)
                 last_killed = kill_target
-                km = cur_mult if "kill" in modes else 1.0
                 bet_combos = [c for c in COMBOS if c != kill_target]
-                parts = [f"{c}{int(cfg.get('killAmounts',cfg.get('amounts',{})).get(c,10000)*km)}" for c in bet_combos]
+                parts = [f"{c}{int(cfg.get('amounts',{}).get(c,10000)*cur_mult)}" for c in bet_combos]
                 messages.append(" ".join(parts))
-                await cm.send(cid,{"type":"bet_log","message":f"杀组: 杀:{kill_target} 胜率:{rate*100:.1f}%"})
+                await cm.send(cid,{"type":"bet_log","message":f"杀组: 杀:{kill_target} 胜率:{rate*100:.1f}% 倍率:{cur_mult:.1f}x"})
 
-            # ABC杀码
+            # ABC杀码（不倍投）
             if "abc" in modes:
                 preds = abc_manager.get_all_predictions(h)
                 balls = cfg.get("abcBalls",["A"])
-                am = cfg.get("abcAmount",1000)  # ABC不倍投
+                am = int(cfg.get("abcAmount",1000))
                 all_parts = []
                 for ball in balls:
-                    info = preds.get(ball,{}); bet_nums = info.get('bet_numbers',[])
-                    if bet_nums: all_parts.extend([f"{ball.lower()}{n}/{am}" for n in bet_nums])
-                if all_parts: messages.append("\n".join(all_parts))
+                    info = preds.get(ball,{})
+                    bet_nums = info.get('bet_numbers',[])
+                    if bet_nums:
+                        all_parts.extend([f"{ball.lower()}{n}/{am}" for n in bet_nums])
+                if all_parts:
+                    messages.append("\n".join(all_parts))
 
-            # 追极值+豹子
+            # 追极值+豹子（不倍投）
             if "extreme" in modes:
                 extremes = cfg.get("extremeNumbers",[])
-                am = cfg.get("extremeAmount",1000)  # 极值不倍投
+                am = int(cfg.get("extremeAmount",1000))
                 parts = [f"{n}/{am}" for n in extremes]
-                # 豹子
                 if cfg.get("extremeBaozi",False):
-                    parts.extend([f"{n}{n}{n}/{am}" for n in range(10)])
-                if parts: messages.append("\n".join(parts))
+                    parts.append(f"豹子/{am}")
+                if parts:
+                    messages.append("\n".join(parts))
 
             msg = "\n".join(messages)
-            if ctag and msg: msg += "\n" + ctag
+            if ctag and msg:
+                msg += "\n" + ctag
             if msg:
                 try:
                     await cl.send_message(chid,msg)
