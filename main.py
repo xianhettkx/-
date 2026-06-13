@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""小鶴神 · 智投PC v6.3 - Bot版倍投逻辑"""
+"""小鶴神 · 智投PC v7.0 - 多模式同时下注 + 极值豹子"""
 
 import asyncio, json, os, re, random, math
 from datetime import datetime
@@ -30,10 +30,11 @@ Config.STATIC_DIR.mkdir(exist_ok=True)
 Config.DATA_DIR.mkdir(exist_ok=True)
 Config.SESSIONS_DIR.mkdir(exist_ok=True)
 
-app = FastAPI(title="小鶴神 · 智投PC", version="6.3")
+app = FastAPI(title="小鶴神 · 智投PC", version="7.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+# ==================== ABC杀码 ====================
 KILL_MODELS = {}
 def create_advanced_predictor(depth, offset, weight, formula_type, step):
     def predictor(history_balls):
@@ -69,6 +70,7 @@ class HighWinRateManager:
 
 abc_manager = HighWinRateManager()
 
+# ==================== 杀组模型 ====================
 COMBOS = ["大单", "小单", "大双", "小双"]
 ALL_MODELS = {}
 
@@ -95,7 +97,7 @@ def sdh(hd,m,d):
     elif m==3: return h[1::2] if len(h)>=2 else h
     else: return h[len(h)//2:]
 
-def cf(h,ft):
+def cfh(h,ft):
     r = {f:0 for f in NF}
     if not h: return r
     if ft==0: [r.update({x:r.get(x,0)+1}) for x in h]
@@ -112,7 +114,7 @@ def cf(h,ft):
     return r
 
 def nkm(hd,c,mid):
-    d = sdh(hd,c["slice"],c["depth"]); fe = cf(d,c["feature"])
+    d = sdh(hd,c["slice"],c["depth"]); fe = cfh(d,c["feature"])
     sc = {}
     for i,f in enumerate(NF):
         ba = fe[f]; no = math.sin(mid*0.31+i)+math.cos(mid*0.17*(i+1))+((mid%7)-3)*0.1
@@ -334,17 +336,18 @@ async def hgp(cid,d):
 
 async def hsb(cid,d):
     ph=d.get("phone",""); chid=d.get("channel_id","")
-    mode=d.get("mode","kill"); cfg=d.get("config",{})
+    cfg=d.get("config",{})
+    modes=cfg.get("modes",["kill"])  # 支持多模式
     cl=cm.gc(ph)
     if not cl: await cm.send(cid,{"type":"betting_started","success":False,"error":"未登录"}); return
     tk=f"{ph}_{chid}"
     if tk in cm.bt: cm.bt[tk].cancel()
-    task=asyncio.create_task(bl(cid,ph,int(chid),mode,cfg,cl))
+    task=asyncio.create_task(bl(cid,ph,int(chid),modes,cfg,cl))
     cm.bt[tk]=task
     await cm.send(cid,{"type":"betting_started","success":True})
 
-# ==================== Bot版倍投逻辑 ====================
-async def bl(cid,ph,chid,mode,cfg,cl):
+# ==================== 多模式投注循环 ====================
+async def bl(cid,ph,chid,modes,cfg,cl):
     last_qihao = None
     last_killed = None
     consec_losses = 0
@@ -359,8 +362,8 @@ async def bl(cid,ph,chid,mode,cfg,cl):
             latest = h[0]; cur_qihao = latest['qihao']
             if cur_qihao == last_qihao: await asyncio.sleep(3); continue
 
-            # ===== Bot版判断上期输赢 =====
-            if last_qihao is not None and last_killed is not None and mode == "kill":
+            # 判断上期输赢（仅杀组）
+            if last_qihao is not None and last_killed is not None and "kill" in modes:
                 actual_combo = latest.get('combo','')
                 if actual_combo == last_killed:
                     consec_losses += 1
@@ -379,31 +382,41 @@ async def bl(cid,ph,chid,mode,cfg,cl):
             await cm.send(cid,{"type":"bet_log","message":f"[{datetime.now().strftime('%H:%M:%S')}] 新期{cur_qihao} {Config.BET_DELAY}s后 | 连输:{consec_losses} 倍率:{cur_mult:.1f}x"})
             await asyncio.sleep(Config.BET_DELAY)
 
-            # 更新期号
             last_qihao = cur_qihao
-            msg = ""
+            messages = []
 
-            if mode == "kill":
+            # 杀组
+            if "kill" in modes:
                 kill_target, rate, _ = mm.fbm(h)
                 last_killed = kill_target
+                km = cur_mult if "kill" in modes else 1.0
                 bet_combos = [c for c in COMBOS if c != kill_target]
-                parts = [f"{c}{int(cfg.get('amounts',{}).get(c,10000)*cur_mult)}" for c in bet_combos]
-                msg = " ".join(parts)
-                await cm.send(cid,{"type":"bet_log","message":f"期:{cur_qihao} 杀:{kill_target} 胜率:{rate*100:.1f}% 倍率:{cur_mult:.1f}x"})
+                parts = [f"{c}{int(cfg.get('killAmounts',cfg.get('amounts',{})).get(c,10000)*km)}" for c in bet_combos]
+                messages.append(" ".join(parts))
+                await cm.send(cid,{"type":"bet_log","message":f"杀组: 杀:{kill_target} 胜率:{rate*100:.1f}%"})
 
-            elif mode == "abc":
+            # ABC杀码
+            if "abc" in modes:
                 preds = abc_manager.get_all_predictions(h)
-                balls = cfg.get("balls",["A"]); amt = int(cfg.get("abcAmount",1000)*cur_mult)
+                balls = cfg.get("abcBalls",["A"])
+                am = cfg.get("abcAmount",1000)  # ABC不倍投
                 all_parts = []
                 for ball in balls:
                     info = preds.get(ball,{}); bet_nums = info.get('bet_numbers',[])
-                    if bet_nums: all_parts.extend([f"{ball.lower()}{n}/{amt}" for n in bet_nums])
-                msg = "\n".join(all_parts) if all_parts else ""
+                    if bet_nums: all_parts.extend([f"{ball.lower()}{n}/{am}" for n in bet_nums])
+                if all_parts: messages.append("\n".join(all_parts))
 
-            elif mode == "extreme":
-                extremes = cfg.get("extremeNumbers",[]); amt = int(cfg.get("extremeAmount",1000)*cur_mult)
-                msg = "\n".join([f"{n}/{amt}" for n in extremes])
+            # 追极值+豹子
+            if "extreme" in modes:
+                extremes = cfg.get("extremeNumbers",[])
+                am = cfg.get("extremeAmount",1000)  # 极值不倍投
+                parts = [f"{n}/{am}" for n in extremes]
+                # 豹子
+                if cfg.get("extremeBaozi",False):
+                    parts.extend([f"{n}{n}{n}/{am}" for n in range(10)])
+                if parts: messages.append("\n".join(parts))
 
+            msg = "\n".join(messages)
             if ctag and msg: msg += "\n" + ctag
             if msg:
                 try:
@@ -421,5 +434,5 @@ async def hst(cid,d):
     await cm.send(cid,{"type":"betting_stopped","success":True})
 
 if __name__=="__main__":
-    print("小鶴神 · 智投PC v6.3")
+    print("小鶴神 · 智投PC v7.0")
     uvicorn.run(app,host=Config.HOST,port=Config.PORT)
