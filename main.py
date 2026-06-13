@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""小鶴神 · 智投PC v8.1 - 500 Quantum杀组 + 强制轮换"""
+"""小鶴神 · 智投PC v9.0 - 500 Quantum + 500 Unique增强 双引擎杀组"""
 
-import asyncio, json, os, re, random, math
+import asyncio, json, os, re, random, math, hashlib
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Optional
-from collections import Counter
+from collections import Counter, defaultdict
+import numpy as np
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
@@ -30,15 +31,16 @@ Config.STATIC_DIR.mkdir(exist_ok=True)
 Config.DATA_DIR.mkdir(exist_ok=True)
 Config.SESSIONS_DIR.mkdir(exist_ok=True)
 
-app = FastAPI(title="小鶴神 · 智投PC", version="8.1")
+app = FastAPI(title="小鶴神 · 智投PC", version="9.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 COMBOS = ["大单", "小单", "大双", "小双"]
 
-# ==================== 500 Quantum杀组模型 ====================
+# ==================== 500 Quantum杀组 ====================
 class QuantumPredictor:
     def __init__(self, model_id):
+        self.model_id = model_id
         random.seed(model_id)
         self.depth = random.randint(15, 45)
         self.weights = {
@@ -50,13 +52,13 @@ class QuantumPredictor:
         self.bias = random.uniform(-0.2, 0.2)
         self.golden_step = random.choice([0.382, 0.618, 1.618])
         self.pattern_len = random.choice([2, 3])
-        self.model_id = model_id
-        self.id_half = model_id % 2 == 0
 
     def predict(self, history):
         combos = ['大单', '小单', '大双', '小双']
         available = history[:self.depth] if len(history) >= self.depth else history
-        if not available: return random.choice(combos)
+        if not available:
+            random.seed(self.model_id)
+            return random.choice(combos)
         scores = {c: 0.0 for c in combos}
         freqs = Counter(available)
         for c in combos:
@@ -86,16 +88,106 @@ class QuantumPredictor:
                 scores[c] += (count / (sum(pmc.values()) + 1e-5)) * self.weights['pattern']
         gi = int(len(available) * (1 / self.golden_step)) % len(available)
         scores[available[gi]] += 0.5 * self.weights['golden']
+        random.seed(self.model_id)
         for c in combos:
             noise = random.normalvariate(0, self.weights['noise'])
             scores[c] += noise + self.bias
-        if self.id_half: return min(scores, key=scores.get)
-        else: return max(scores, key=scores.get)
+        if self.model_id % 2 == 0:
+            return min(scores, key=scores.get)
+        else:
+            return max(scores, key=scores.get)
 
 
+# ==================== 500 Unique增强杀组 ====================
+def extract_features(history, depth):
+    window = history[:depth]
+    feat = {}
+    total = len(window)
+    cnt = Counter(window)
+    feat["freq"] = {k: cnt.get(k,0)/total for k in COMBOS}
+    run_len, max_run = 1,1
+    last = window[0]
+    for c in window[1:]:
+        if c == last: run_len +=1; max_run = max(max_run, run_len)
+        else: run_len =1
+        last = c
+    feat["curr_run"] = run_len; feat["max_run"] = max_run
+    switch = sum(1 for i in range(1,total) if window[i]!=window[i-1])
+    feat["switch_rate"] = switch / max(1, total-1)
+    miss = {}; all_miss = defaultdict(list)
+    for c in COMBOS:
+        pos = None
+        for idx,val in enumerate(window):
+            if val == c: pos = idx; all_miss[c].append(idx)
+        miss[c] = pos if pos is not None else depth
+    feat["miss"] = miss
+    feat["avg_miss"] = {k: np.mean(all_miss[k]) if all_miss[k] else depth for k in COMBOS}
+    half = int(depth * 0.618); half_cnt = Counter(window[:half])
+    feat["golden_freq"] = {k: half_cnt.get(k,0)/half for k in COMBOS}
+    short = min(10, depth); short_cnt = Counter(window[:short])
+    feat["short_freq"] = {k: short_cnt.get(k,0)/short for k in COMBOS}
+    feat["is_hot"] = {k: feat["short_freq"][k] > feat["freq"][k] for k in COMBOS}
+    feat["golden"] = 0.618
+    return feat
+
+class UniqueKillModel:
+    def __init__(self, model_index, seed_salt):
+        h = hashlib.sha256(f"{model_index}_{seed_salt}_pc28_v2".encode()).hexdigest()
+        seed_int = int(h,16) % (2**32)
+        self.rng = random.Random(seed_int)
+        self.depth = self.rng.randint(15, 45)
+        self.w_freq = self.rng.uniform(0.08, 0.92)
+        self.w_run = self.rng.uniform(0.04, 0.55)
+        self.w_miss = self.rng.uniform(0.12, 0.85)
+        self.w_golden = self.rng.uniform(0.02, 0.35)
+        self.w_short = self.rng.uniform(0.1, 0.7)
+        self.w_switch = self.rng.uniform(0.01, 0.35)
+        self.bias = self.rng.uniform(-0.18, 0.18)
+        self.noise = self.rng.uniform(0.0005, 0.012)
+        self.formula = self.rng.randint(0,5)
+        self.pow1 = self.rng.uniform(1.03,1.45)
+        self.pow2 = self.rng.uniform(0.65,0.96)
+        self.reverse_factor = self.rng.uniform(0.2,0.8)
+        self.uid = f"mdl_{model_index}_{seed_int}"
+
+    def predict(self, history):
+        feat = extract_features(history, self.depth)
+        scores = {}
+        noise = np.random.normal(0, self.noise, len(COMBOS))
+        for idx, combo in enumerate(COMBOS):
+            f = feat["freq"][combo]; mr = feat["max_run"] / self.depth
+            ms = feat["miss"][combo] / self.depth; gm = feat["golden_freq"][combo]
+            sf = feat["short_freq"][combo]; sw = feat["switch_rate"]
+            hot = feat["is_hot"][combo]; gd = feat["golden"]
+            if self.formula == 0:
+                base = self.w_freq*f + self.w_run*mr + self.w_miss*ms + self.w_golden*gm + self.w_short*sf
+            elif self.formula == 1:
+                base = self.w_freq*(1-f) + self.w_miss*ms - self.w_run*mr
+            elif self.formula == 2:
+                base = np.exp(self.w_short*sf + self.w_miss*ms) - self.bias*self.pow1
+            elif self.formula == 3:
+                base = (f**self.pow1)*self.w_freq + (ms**self.pow2)*self.w_miss - self.w_short*sf
+            elif self.formula == 4:
+                bayes = sf / (f + 1e-6)
+                base = bayes * self.reverse_factor + self.w_miss*ms
+            else:
+                base = (gm * gd) * self.w_golden + self.w_switch*sw + self.w_miss*ms
+            if hot: base *= (1 + self.reverse_factor)
+            base += noise[idx]
+            scores[combo] = base
+        return max(scores, key=scores.get)
+
+
+# ==================== 双引擎模型管理器 ====================
 class ModelManager:
     def __init__(self):
-        self.models = [QuantumPredictor(i) for i in range(1, 501)]
+        # Quantum 500个
+        self.quantum_models = [QuantumPredictor(i) for i in range(1, 501)]
+        # Unique增强 500个
+        salt = str(random.randint(100000, 999999))
+        self.unique_models = [UniqueKillModel(i, salt) for i in range(500)]
+        # 合并
+        self.all_models = self.quantum_models + self.unique_models
 
     def fbm(self, history):
         combos_only = [h.get('combo', '') for h in history]
@@ -103,20 +195,19 @@ class ModelManager:
         total = min(50, len(combos_only) - 1)
         if total < 5: return random.choice(COMBOS), 0, 0
 
-        for model in self.models:
+        for i, model in enumerate(self.all_models):
             win = 0
-            for i in range(1, total + 1):
+            for j in range(1, total + 1):
                 try:
-                    pred = model.predict(combos_only[i:])
-                    actual = combos_only[i-1]
+                    pred = model.predict(combos_only[j:])
+                    actual = combos_only[j-1]
                     if actual and actual != pred: win += 1
                 except: continue
             rate = win / total if total > 0 else 0
-            results.append((model.model_id, rate, model.predict(combos_only)))
+            results.append((i, rate, model.predict(combos_only)))
 
         results.sort(key=lambda x: x[1], reverse=True)
-        top5 = results[:5]
-        best = random.choice(top5)
+        best = results[0]
         return best[2], best[1], best[0]
 
 mm = ModelManager()
@@ -328,7 +419,7 @@ async def hsb(cid,d):
     cm.bt[tk]=task
     await cm.send(cid,{"type":"betting_started","success":True})
 
-# ==================== 投注循环（强制轮换版） ====================
+# ==================== 投注循环 ====================
 async def bl(cid,ph,chid,modes,cfg,cl):
     last_qihao = None
     last_killed = None
@@ -336,7 +427,7 @@ async def bl(cid,ph,chid,modes,cfg,cl):
     mult = float(cfg.get("multiplier",2.0))
     max_loss = int(cfg.get("maxLoss",5))
     ctag = cfg.get("customTag","")
-    kill_history = []  # 记录最近杀的组合
+    kill_history = []
 
     try:
         while True:
@@ -370,16 +461,13 @@ async def bl(cid,ph,chid,modes,cfg,cl):
             if "kill" in modes:
                 kill_target, rate, _ = mm.fbm(h)
 
-                # 记录杀组历史
                 kill_history.append(kill_target)
                 if len(kill_history) > 3: kill_history.pop(0)
-
-                # 连杀3期同一个，强制换
                 if len(kill_history) == 3 and len(set(kill_history)) == 1:
                     other = [c for c in COMBOS if c != kill_target]
                     kill_target = random.choice(other)
-                    kill_history = [kill_target]  # 重置记录
-                    await cm.send(cid,{"type":"bet_log","message":f"⚠ 连杀3期{kill_history[0]}，强制换杀:{kill_target}"})
+                    kill_history = [kill_target]
+                    await cm.send(cid,{"type":"bet_log","message":f"⚠ 连杀3期同一组合，强制换杀:{kill_target}"})
 
                 last_killed = kill_target
                 bet_combos = [c for c in COMBOS if c != kill_target]
@@ -420,5 +508,5 @@ async def hst(cid,d):
     await cm.send(cid,{"type":"betting_stopped","success":True})
 
 if __name__=="__main__":
-    print("小鶴神 · 智投PC v8.1")
+    print("小鶴神 · 智投PC v9.0 - 双引擎1000模型")
     uvicorn.run(app,host=Config.HOST,port=Config.PORT)
