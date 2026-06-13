@@ -98,20 +98,41 @@
     </div>
 
     <div class="card hidden" id="panel-settings"><div class="ct">🎯 投注设置</div>
-        <div class="mt"><div class="mtab act" onclick="switchMode('kill')" id="tab-kill">🎯 杀组</div><div class="mtab" onclick="switchMode('abc')" id="tab-abc">🔮 ABC杀码</div><div class="mtab" onclick="switchMode('extreme')" id="tab-extreme">🎪 追极值</div></div>
-        <div id="planSection" class="fg"><label class="fl">已保存方案</label><div class="pl" id="planList"></div><button class="btn bo bsm" onclick="savePlan()">💾 保存当前为方案</button></div>
-        <div id="settings-kill">
-            <div class="fl">杀组预测（模型自动） <button class="btn bo bsm" onclick="refreshPrediction()">🔄 刷新</button></div>
+        <!-- 多模式选择 -->
+        <div class="fg">
+            <label class="fl">启用模式（可多选）</label>
+            <div style="display:flex;gap:12px;flex-wrap:wrap">
+                <label class="ack"><input type="checkbox" id="modeKill" checked onchange="toggleModePanels()"> 杀组</label>
+                <label class="ack"><input type="checkbox" id="modeAbc" onchange="toggleModePanels()"> ABC杀码</label>
+                <label class="ack"><input type="checkbox" id="modeExtreme" onchange="toggleModePanels()"> 追极值</label>
+            </div>
+        </div>
+
+        <!-- 杀组 -->
+        <div id="panel-kill-mode">
+            <div class="fl" style="margin-top:10px">杀组预测（模型自动） <button class="btn bo bsm" onclick="refreshPrediction()">🔄 刷新</button></div>
             <div class="cg" id="comboCards"></div>
             <div class="wb" id="killWinrate" style="display:none"><span>📈 模型胜率:</span><span class="rate" id="killRate">--%</span><span style="font-size:11px;color:var(--text2)" id="killModelInfo"></span></div>
             <div class="fl" style="margin-top:8px">预设金额</div><div id="amountInputs"></div>
+            <div id="planSection" class="fg" style="margin-top:10px"><label class="fl">已保存方案</label><div class="pl" id="planList"></div><button class="btn bo bsm" onclick="savePlan()">💾 保存当前为方案</button></div>
         </div>
-        <div id="settings-abc" class="hidden">
+
+        <!-- ABC杀码 -->
+        <div id="panel-abc-mode" class="hidden">
+            <div class="fl" style="margin-top:10px">ABC杀码预测</div>
             <div class="ac"><label class="ack"><input type="checkbox" id="abcA" checked onchange="refreshPrediction()"> A球</label><label class="ack"><input type="checkbox" id="abcB" onchange="refreshPrediction()"> B球</label><label class="ack"><input type="checkbox" id="abcC" onchange="refreshPrediction()"> C球</label><button class="btn bo bsm" onclick="refreshPrediction()">🔄 刷新</button></div>
             <div id="abcResults"></div>
             <div class="fg"><label class="fl">每个号码金额</label><input type="number" class="fi" id="abcAmount" value="1000" min="1"></div>
         </div>
-        <div id="settings-extreme" class="hidden"><div class="fl">选择极值号码</div><div class="eg" id="extremeGrid"></div><div class="fg"><label class="fl">每个号码金额</label><input type="number" class="fi" id="extremeAmount" value="1000" min="1"></div></div>
+
+        <!-- 追极值 -->
+        <div id="panel-extreme-mode" class="hidden">
+            <div class="fl" style="margin-top:10px">选择极值号码</div>
+            <div class="eg" id="extremeGrid"></div>
+            <div class="fg"><label class="fl">每个号码金额</label><input type="number" class="fi" id="extremeAmount" value="1000" min="1"></div>
+            <label class="ack" style="margin-top:6px"><input type="checkbox" id="extremeBaozi"> 豹子（000-999各一注）</label>
+        </div>
+
         <div class="tc" style="margin-top:10px"><div class="fg"><label class="fl">倍投乘数</label><input type="number" class="fi" id="multiplierInput" value="2.0" step="0.1"></div><div class="fg"><label class="fl">最大倍投次数</label><input type="number" class="fi" id="maxLossInput" value="5"></div></div>
         <div class="fg" style="margin-top:8px"><label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:6px"><input type="checkbox" id="customTagOn" onchange="document.getElementById('customTag').classList.toggle('hidden',!this.checked)"> 启用自定义尾缀</label><input type="text" class="fi hidden" id="customTag" placeholder="输入尾缀文字" maxlength="30"></div>
         <button class="btn bs" onclick="startBetting()">🚀 开始自动投注</button>
@@ -119,118 +140,149 @@
 
     <div class="card hidden" id="panel-running"><div class="ct">📡 运行中 <span class="tag ts" id="runStatus">Active</span></div>
         <div class="tc"><div><div class="fl">当前期号</div><div style="font-size:20px;font-weight:700" id="runQihao">--</div></div><div><div class="fl">杀组目标</div><div style="font-size:20px;font-weight:700;color:var(--dan)" id="runKill">--</div></div></div>
-        <div style="margin-top:8px"><div class="fl">下注预览</div><div style="background:var(--bg);padding:10px;border-radius:var(--rs);font-family:monospace;font-size:12px" id="betPreview">--</div></div>
+        <div style="margin-top:8px"><div class="fl">下注预览</div><div style="background:var(--bg);padding:10px;border-radius:var(--rs);font-family:monospace;font-size:12px;white-space:pre-wrap" id="betPreview">--</div></div>
         <div style="margin-top:8px"><div class="fl">日志</div><div class="la" id="logArea"><div>🟢 就绪</div></div></div>
         <button class="btn bd" onclick="stopBetting()" style="margin-top:10px">🛑 停止</button>
     </div>
 </div>
 
 <script>
-const S={logged:false,phone:'',accounts:{},selAcc:'',selCh:{id:'',name:''},mode:'kill',killed:'',exts:[],running:false,hist:['login'],amts:{'大单':0,'小单':0,'大双':0,'小双':0},plans:{},odds:{'大单':{r:4.32,g:'high'},'小单':{r:3.71,g:'low'},'大双':{r:3.71,g:'low'},'小双':{r:4.32,g:'high'}}};
-const C=['大单','小单','大双','小双'];
-const EX=[0,1,2,3,4,23,24,25,26,27];
+var S={logged:false,phone:'',accounts:{},selAcc:'',selCh:{id:'',name:''},killed:'',exts:[],running:false,hist:['login'],amts:{'大单':0,'小单':0,'大双':0,'小双':0},plans:{},odds:{'大单':{r:4.32,g:'high'},'小单':{r:3.71,g:'low'},'大双':{r:3.71,g:'low'},'小双':{r:4.32,g:'high'}}};
+var C=['大单','小单','大双','小双'];
+var EX=[0,1,2,3,4,23,24,25,26,27];
 
 function lp(){try{S.plans=JSON.parse(localStorage.getItem('p28p')||'{}')}catch(e){}}
 function sp(){localStorage.setItem('p28p',JSON.stringify(S.plans))}
-function la(){try{const a=JSON.parse(localStorage.getItem('p28a'));if(a)S.amts=a}catch(e){}}
+function la(){try{var a=JSON.parse(localStorage.getItem('p28a'));if(a)S.amts=a}catch(e){}}
 function sa(){localStorage.setItem('p28a',JSON.stringify(S.amts))}
 
-let ws,wid='p28_'+Date.now();
+var ws,wid='p28_'+Date.now();
 function cws(){
-    ws=new WebSocket(`${location.protocol==='https:'?'wss':'ws'}://${location.host}/ws/${wid}`);
-    ws.onopen=()=>{log('success','已连接');getLatest();ws.send(JSON.stringify({type:'check_status'}))};
-    ws.onmessage=e=>{try{hm(JSON.parse(e.data))}catch(ex){}};
-    ws.onclose=()=>{setTimeout(cws,3000)};
+    ws=new WebSocket((location.protocol==='https:'?'wss':'ws')+'://'+location.host+'/ws/'+wid);
+    ws.onopen=function(){log('success','已连接');getLatest();ws.send(JSON.stringify({type:'check_status'}))};
+    ws.onmessage=function(e){try{hm(JSON.parse(e.data))}catch(ex){}};
+    ws.onclose=function(){setTimeout(cws,3000)};
 }
 function hm(d){
     if(d.type==='connected'){getLatest()}
     else if(d.type==='saved_sessions'){
-        d.accounts.forEach(a=>S.accounts[a.phone]={phone:a.phone,name:a.name,channels:[]});
-        if(d.accounts.length>0){S.logged=true;S.selAcc=d.accounts[0].phone;ul(d.accounts[0].name);ws.send(JSON.stringify({type:'get_channels',phone:d.accounts[0].phone}));spn('channels');}
+        d.accounts.forEach(function(a){S.accounts[a.phone]={phone:a.phone,name:a.name,channels:[]}});
+        if(d.accounts.length>0){S.logged=true;S.selAcc=d.accounts[0].phone;ul(d.accounts[0].name);ws.send(JSON.stringify({type:'get_channels',phone:d.accounts[0].phone}));spn('channels')}
     }
     else if(d.type==='send_code_result'){document.getElementById('btnLogin').disabled=false;if(d.already_logged_in){hls(d);return}if(d.success){S.phone=d.phone;document.getElementById('codeSection').classList.remove('hidden');document.getElementById('btnLogin').textContent='🔓 验证登录';document.getElementById('codeInput').focus()}else{document.getElementById('btnLogin').textContent='📨 发送验证码';log('error',d.error)}}
     else if(d.type==='verify_code_result'){document.getElementById('btnLogin').disabled=false;if(d.need_password){document.getElementById('codeSection').classList.add('hidden');document.getElementById('passwordSection').classList.remove('hidden');document.getElementById('btnLogin').textContent='🔒 提交密码'}else if(d.success)hls(d);else{document.getElementById('btnLogin').textContent='🔓 验证登录';log('error',d.error)}}
     else if(d.type==='verify_password_result'){document.getElementById('btnLogin').disabled=false;if(d.success)hls(d);else log('error',d.error)}
-    else if(d.type==='channels'&&d.success){const a=S.accounts[S.selAcc];if(a){a.channels=d.data;ucs();log('success',d.data.length+' 个群组')}}
+    else if(d.type==='channels'&&d.success){var a=S.accounts[S.selAcc];if(a){a.channels=d.data;ucs();log('success',d.data.length+' 个群组')}}
     else if(d.type==='latest_data'&&d.latest){document.getElementById('latestQihao').textContent='期号: '+d.latest.qihao;document.getElementById('latestResult').textContent=d.latest.combo+' ('+d.latest.sum+')';document.getElementById('latestSum').textContent=d.latest.number||'';document.getElementById('latestResult').className='res '+(d.latest.sum>=14?'big':'small')}
     else if(d.type==='prediction'){
-        if(d.mode==='kill'){
-            S.killed=d.kill_target;ucc();
-            document.getElementById('killRate').textContent=d.win_rate+'%';
-            document.getElementById('killModelInfo').textContent='模型#'+d.model_id;
-            document.getElementById('killWinrate').style.display='flex';
-            document.getElementById('latestQihao').textContent='期号: '+d.latest_qihao;
-            document.getElementById('latestResult').textContent=d.latest_combo+' ('+d.latest_sum+')';
-        }
-        else if(d.mode==='abc'){let h='';for(const[b,r]of Object.entries(d.results)){h+=`<div class="wb" style="margin-bottom:6px"><span style="font-weight:700">${b}球</span><span>杀:</span><strong style="color:var(--dan);font-size:16px">${r.kill_num}</strong><span class="rate">${(r.win_rate*100).toFixed(1)}%</span><span style="font-size:11px;color:var(--text2)">模型#${r.model_id}</span>${r.status?('<span style="font-size:11px;color:var(--war)">'+r.status+'</span>'):''}<div style="font-size:11px;color:var(--text2)">投: ${(r.bet_numbers||[]).join(',')}</div></div>`}document.getElementById('abcResults').innerHTML=h||'<div class="tip">点击刷新获取预测</div>'}
+        if(d.mode==='kill'){S.killed=d.kill_target;ucc();document.getElementById('killRate').textContent=d.win_rate+'%';document.getElementById('killModelInfo').textContent='模型#'+d.model_id;document.getElementById('killWinrate').style.display='flex';document.getElementById('latestQihao').textContent='期号: '+d.latest_qihao;document.getElementById('latestResult').textContent=d.latest_combo+' ('+d.latest_sum+')'}
+        else if(d.mode==='abc'){var h='';for(var b in d.results){var r=d.results[b];h+='<div class="wb" style="margin-bottom:6px"><span style="font-weight:700">'+b+'球</span><span>杀:</span><strong style="color:var(--dan);font-size:16px">'+r.kill_num+'</strong><span class="rate">'+(r.win_rate*100).toFixed(1)+'%</span><span style="font-size:11px;color:var(--text2)">模型#'+r.model_id+'</span>'+(r.status?'<span style="font-size:11px;color:var(--war)">'+r.status+'</span>':'')+'<div style="font-size:11px;color:var(--text2)">投: '+(r.bet_numbers||[]).join(',')+'</div></div>'}document.getElementById('abcResults').innerHTML=h||'<div class="tip">点击刷新获取预测</div>'}
     }
     else if(d.type==='betting_started'&&d.success){S.running=true;spn('running');log('success','已启动')}
     else if(d.type==='betting_stopped'){S.running=false;log('warning','已停止')}
     else if(d.type==='bet_log'){
         log(d.error?'error':'info', d.message);
         var m=d.message||'';
-        // 从后端日志提取实际杀的组合
-        var km=m.match(/杀:(.+?) /);
-        if(km){
-            S.killed=km[1];
-            document.getElementById('runKill').textContent=S.killed;
-        }
-        var qm=m.match(/期:(\d+)/);
-        if(qm)document.getElementById('runQihao').textContent=qm[1];
-        // 实时更新下注预览
-        if(m.indexOf('已发送')>=0 || m.indexOf('杀:')>=0) ubp();
+        var km=m.match(/杀:(.+?) /);if(km){S.killed=km[1];document.getElementById('runKill').textContent=S.killed}
+        var qm=m.match(/期:(\d+)/);if(qm)document.getElementById('runQihao').textContent=qm[1];
+        if(m.indexOf('已发送')>=0||m.indexOf('杀组:')>=0) ubp();
     }
 }
 function hls(d){S.logged=true;S.phone=d.phone;if(!S.accounts[d.phone])S.accounts[d.phone]={phone:d.phone,name:d.name,channels:[]};S.accounts[d.phone].name=d.name;S.selAcc=d.phone;ul(d.name);document.getElementById('codeSection').classList.add('hidden');document.getElementById('passwordSection').classList.add('hidden');document.getElementById('btnLogin').textContent='📨 发送验证码';document.getElementById('btnLogin').disabled=false;log('success','登录成功');ws.send(JSON.stringify({type:'get_channels',phone:d.phone}));spn('channels')}
 function ul(n){document.getElementById('statusDot').classList.add('on');document.getElementById('statusText').textContent=n+' · 已登录'}
 
-function spn(n){if(S.hist[S.hist.length-1]!==n)S.hist.push(n);['login','channels','settings','running'].forEach(x=>document.getElementById('panel-'+x).classList.toggle('hidden',x!==n));document.getElementById('backBtn').classList.toggle('hidden',n==='login');if(n==='channels')uas();if(n==='settings'){ucc();rai();upl();refreshPrediction()}if(n==='running')ubp()}
-function goBack(){if(S.hist.length>1){S.hist.pop();const p=S.hist.pop();spn(p)}}
+function spn(n){if(S.hist[S.hist.length-1]!==n)S.hist.push(n);['login','channels','settings','running'].forEach(function(x){document.getElementById('panel-'+x).classList.toggle('hidden',x!==n)});document.getElementById('backBtn').classList.toggle('hidden',n==='login');if(n==='channels')uas();if(n==='settings'){ucc();rai();upl();refreshPrediction();toggleModePanels()}if(n==='running')ubp()}
+function goBack(){if(S.hist.length>1){S.hist.pop();spn(S.hist.pop())}}
 
-function handleLogin(){const ph=document.getElementById('phoneInput').value.trim();if(!ph.startsWith('+')){log('error','请输入正确手机号');return}if(!ws||ws.readyState!==1){cws();return}const btn=document.getElementById('btnLogin');if(!document.getElementById('codeSection').classList.contains('hidden')){const cd=document.getElementById('codeInput').value.trim();if(!cd){log('error','请输入验证码');return}btn.disabled=true;btn.textContent='...';ws.send(JSON.stringify({type:'verify_code',code:cd}))}else if(!document.getElementById('passwordSection').classList.contains('hidden')){const pw=document.getElementById('passwordInput').value.trim();if(!pw){log('error','请输入密码');return}btn.disabled=true;btn.textContent='...';ws.send(JSON.stringify({type:'verify_password',password:pw}))}else{btn.disabled=true;btn.textContent='发送中...';ws.send(JSON.stringify({type:'send_code',phone:ph}))}}
+function handleLogin(){var ph=document.getElementById('phoneInput').value.trim();if(!ph.startsWith('+')){log('error','请输入正确手机号');return}if(!ws||ws.readyState!==1){cws();return}var btn=document.getElementById('btnLogin');if(!document.getElementById('codeSection').classList.contains('hidden')){var cd=document.getElementById('codeInput').value.trim();if(!cd){log('error','请输入验证码');return}btn.disabled=true;btn.textContent='...';ws.send(JSON.stringify({type:'verify_code',code:cd}))}else if(!document.getElementById('passwordSection').classList.contains('hidden')){var pw=document.getElementById('passwordInput').value.trim();if(!pw){log('error','请输入密码');return}btn.disabled=true;btn.textContent='...';ws.send(JSON.stringify({type:'verify_password',password:pw}))}else{btn.disabled=true;btn.textContent='发送中...';ws.send(JSON.stringify({type:'send_code',phone:ph}))}}
 
-function uas(){const s=document.getElementById('accountSelect');s.innerHTML='<option value="">-- 选择账号 --</option>';for(const[p,a]of Object.entries(S.accounts)){const o=document.createElement('option');o.value=p;o.textContent=a.name+' ('+p+')';if(p===S.selAcc)o.selected=true;s.appendChild(o)}if(S.selAcc)ucs()}
+function uas(){var s=document.getElementById('accountSelect');s.innerHTML='<option value="">-- 选择账号 --</option>';for(var p in S.accounts){var a=S.accounts[p];var o=document.createElement('option');o.value=p;o.textContent=a.name+' ('+p+')';if(p===S.selAcc)o.selected=true;s.appendChild(o)}if(S.selAcc)ucs()}
 function onAccountChange(){S.selAcc=document.getElementById('accountSelect').value;if(S.selAcc)ucs();ccf()}
-function ucs(){const s=document.getElementById('channelSelect');s.innerHTML='<option value="">-- 选择频道 --</option>';const a=S.accounts[S.selAcc];if(a&&a.channels)a.channels.forEach(c=>{const o=document.createElement('option');o.value=JSON.stringify({id:c.id,name:c.name});o.textContent=(c.type==='channel'?'📢':'👥')+c.name;s.appendChild(o)})}
-function refreshChannels(){if(S.selAcc&&ws&&ws.readyState===1){ws.send(JSON.stringify({type:'get_channels',phone:S.selAcc}))}}
+function ucs(){var s=document.getElementById('channelSelect');s.innerHTML='<option value="">-- 选择频道 --</option>';var a=S.accounts[S.selAcc];if(a&&a.channels)a.channels.forEach(function(c){var o=document.createElement('option');o.value=JSON.stringify({id:c.id,name:c.name});o.textContent=(c.type==='channel'?'📢':'👥')+c.name;s.appendChild(o)})}
+function refreshChannels(){if(S.selAcc&&ws&&ws.readyState===1)ws.send(JSON.stringify({type:'get_channels',phone:S.selAcc}))}
 function ccf(){document.getElementById('btnConfirmChannel').disabled=!S.selAcc||!document.getElementById('channelSelect').value}
 function confirmChannel(){try{S.selCh=JSON.parse(document.getElementById('channelSelect').value);log('success','已选择: '+S.selCh.name);spn('settings')}catch(e){log('error','选择无效')}}
-document.addEventListener('change',e=>{if(e.target.id==='channelSelect')ccf()});
+document.addEventListener('change',function(e){if(e.target.id==='channelSelect')ccf()});
 
-function switchMode(m){S.mode=m;document.getElementById('tab-kill').classList.toggle('act',m==='kill');document.getElementById('tab-abc').classList.toggle('act',m==='abc');document.getElementById('tab-extreme').classList.toggle('act',m==='extreme');document.getElementById('settings-kill').classList.toggle('hidden',m!=='kill');document.getElementById('settings-abc').classList.toggle('hidden',m!=='abc');document.getElementById('settings-extreme').classList.toggle('hidden',m!=='extreme');document.getElementById('planSection').classList.toggle('hidden',m!=='kill');if(m==='kill'){ucc();rai();upl()}refreshPrediction()}
+function toggleModePanels(){
+    document.getElementById('panel-kill-mode').classList.toggle('hidden',!document.getElementById('modeKill').checked);
+    document.getElementById('panel-abc-mode').classList.toggle('hidden',!document.getElementById('modeAbc').checked);
+    document.getElementById('panel-extreme-mode').classList.toggle('hidden',!document.getElementById('modeExtreme').checked);
+}
 
-function savePlan(){const n=prompt('方案名称:','方案'+(Object.keys(S.plans).length+1));if(!n)return;S.plans[n]={amts:{...S.amts}};sp();upl();log('success','方案已保存')}
-function loadPlan(n){const p=S.plans[n];if(!p)return;S.amts={...p.amts};ucc();rai()}
+function savePlan(){var n=prompt('方案名称:','方案'+(Object.keys(S.plans).length+1));if(!n)return;S.plans[n]={amts:{...S.amts}};sp();upl();log('success','方案已保存')}
+function loadPlan(n){var p=S.plans[n];if(!p)return;S.amts={...p.amts};ucc();rai()}
 function deletePlan(n){if(confirm('删除?')){delete S.plans[n];sp();upl()}}
-function upl(){const e=document.getElementById('planList');const ns=Object.keys(S.plans);if(ns.length===0){e.innerHTML='<span style="color:var(--text2);font-size:12px">暂无方案</span>';return}e.innerHTML=ns.map(n=>`<span class="pi" onclick="loadPlan('${n}')" ondblclick="deletePlan('${n}')">${n}</span>`).join('')}
+function upl(){var e=document.getElementById('planList');var ns=Object.keys(S.plans);if(ns.length===0){e.innerHTML='<span style="color:var(--text2);font-size:12px">暂无方案</span>';return}e.innerHTML=ns.map(function(n){return '<span class="pi" onclick="loadPlan(\''+n+'\')" ondblclick="deletePlan(\''+n+'\')">'+n+'</span>'}).join('')}
 
-function ucc(){const e=document.getElementById('comboCards');e.innerHTML=C.map(c=>{const k=c===S.killed,cl=k?'kill':'bet';const tg=k?'<span class="ctag tag td">已杀</span>':'<span class="ctag tag ts">投注</span>';const am=S.amts[c]||0;return `<div class="cc ${cl}">${tg}<div class="cn">${c}</div><div class="co">赔率 ${S.odds[c].r}</div><div class="ca">${k?'跳过':(am>0?am+' KK':'未设置')}</div></div>`}).join('')}
+function ucc(){var e=document.getElementById('comboCards');e.innerHTML=C.map(function(c){var k=c===S.killed,cl=k?'kill':'bet';var tg=k?'<span class="ctag tag td">已杀</span>':'<span class="ctag tag ts">投注</span>';var am=S.amts[c]||0;return '<div class="cc '+cl+'">'+tg+'<div class="cn">'+c+'</div><div class="co">赔率 '+S.odds[c].r+'</div><div class="ca">'+(k?'跳过':(am>0?am+' KK':'未设置'))+'</div></div>'}).join('')}
 
-function rai(){if(S.mode!=='kill')return;let h='';C.forEach(c=>{const o=S.odds[c],k=c===S.killed;h+=`<div class="ar"><span class="cl" style="color:${k?'var(--dan)':'var(--text)'}">${c}</span><span class="ob ${o.g==='low'?'ol':'oh'}">${o.r}</span><input type="number" id="amt-${c}" value="${S.amts[c]||''}" placeholder="${k?'不投':'金额'}" oninput="oai('${c}',this.value)" inputmode="decimal"></div>`});h+='<div class="tip">提前设好4个组合的金额，模型自动选杀，用剩下3个投注</div>';document.getElementById('amountInputs').innerHTML=h}
+function rai(){
+    var h='';
+    C.forEach(function(c){
+        var o=S.odds[c],k=c===S.killed;
+        h+='<div class="ar"><span class="cl" style="color:'+(k?'var(--dan)':'var(--text)')+'">'+c+'</span><span class="ob '+(o.g==='low'?'ol':'oh')+'">'+o.r+'</span><input type="number" id="amt-'+c+'" value="'+(S.amts[c]||'')+'" placeholder="'+(k?'不投':'金额')+'" oninput="oai(\''+c+'\',this.value)" inputmode="decimal"></div>';
+    });
+    h+='<div class="tip">提前设好4个组合的金额，模型自动选杀，用剩下3个投注</div>';
+    document.getElementById('amountInputs').innerHTML=h;
+}
 function oai(c,v){S.amts[c]=parseInt(v)||0;ucc();sa()}
 
-function ie(){const g=document.getElementById('extremeGrid');EX.forEach(n=>{const e=document.createElement('div');e.className='ei';e.textContent=n;e.onclick=()=>{const i=S.exts.indexOf(n);if(i>=0){S.exts.splice(i,1);e.classList.remove('sel')}else{S.exts.push(n);e.classList.add('sel')}};e.id='ex-'+n;g.appendChild(e)})}
+function ie(){var g=document.getElementById('extremeGrid');EX.forEach(function(n){var e=document.createElement('div');e.className='ei';e.textContent=n;e.onclick=function(){var i=S.exts.indexOf(n);if(i>=0){S.exts.splice(i,1);e.classList.remove('sel')}else{S.exts.push(n);e.classList.add('sel')}};e.id='ex-'+n;g.appendChild(e)})}
 
-function refreshPrediction(){if(!ws||ws.readyState!==1)return;if(S.mode==='kill')ws.send(JSON.stringify({type:'get_prediction',mode:'kill'}));else if(S.mode==='abc'){const b=[];if(document.getElementById('abcA').checked)b.push('A');if(document.getElementById('abcB').checked)b.push('B');if(document.getElementById('abcC').checked)b.push('C');ws.send(JSON.stringify({type:'get_prediction',mode:'abc',balls:b}))}}
+function refreshPrediction(){if(!ws||ws.readyState!==1)return;if(document.getElementById('modeKill').checked)ws.send(JSON.stringify({type:'get_prediction',mode:'kill'}));if(document.getElementById('modeAbc').checked){var b=[];if(document.getElementById('abcA').checked)b.push('A');if(document.getElementById('abcB').checked)b.push('B');if(document.getElementById('abcC').checked)b.push('C');ws.send(JSON.stringify({type:'get_prediction',mode:'abc',balls:b}))}}
 function getLatest(){if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'get_latest'}))}
 
-function startBetting(){if(!S.logged){log('error','请先登录');spn('login');return}if(!S.selCh.id){log('error','请先选择频道');spn('channels');return}const cf={mode:S.mode,killedCombo:S.killed,amounts:S.amts,extremeNumbers:S.exts,extremeAmount:parseInt(document.getElementById('extremeAmount')?.value||1000),abcAmount:parseInt(document.getElementById('abcAmount')?.value||1000),balls:[],multiplier:parseFloat(document.getElementById('multiplierInput').value),maxLoss:parseInt(document.getElementById('maxLossInput').value)};if(S.mode==='abc'){if(document.getElementById('abcA').checked)cf.balls.push('A');if(document.getElementById('abcB').checked)cf.balls.push('B');if(document.getElementById('abcC').checked)cf.balls.push('C')}if(document.getElementById('customTagOn').checked)cf.customTag=document.getElementById('customTag').value.trim();if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'start_betting',phone:S.selAcc,channel_id:S.selCh.id,mode:S.mode,config:cf}))}
+function startBetting(){
+    if(!S.logged){log('error','请先登录');spn('login');return}
+    if(!S.selCh.id){log('error','请先选择频道');spn('channels');return}
+    var modes=[];
+    if(document.getElementById('modeKill').checked)modes.push('kill');
+    if(document.getElementById('modeAbc').checked)modes.push('abc');
+    if(document.getElementById('modeExtreme').checked)modes.push('extreme');
+    if(modes.length===0){log('error','至少选一个模式');return}
+    var cf={
+        modes:modes,
+        amounts:S.amts,
+        killedCombo:S.killed,
+        abcBalls:[],
+        abcAmount:parseInt(document.getElementById('abcAmount')?.value||1000),
+        extremeNumbers:S.exts,
+        extremeAmount:parseInt(document.getElementById('extremeAmount')?.value||1000),
+        extremeBaozi:document.getElementById('extremeBaozi')?.checked||false,
+        multiplier:parseFloat(document.getElementById('multiplierInput').value),
+        maxLoss:parseInt(document.getElementById('maxLossInput').value)
+    };
+    if(document.getElementById('abcA')?.checked)cf.abcBalls.push('A');
+    if(document.getElementById('abcB')?.checked)cf.abcBalls.push('B');
+    if(document.getElementById('abcC')?.checked)cf.abcBalls.push('C');
+    if(document.getElementById('customTagOn').checked)cf.customTag=document.getElementById('customTag').value.trim();
+    if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'start_betting',phone:S.selAcc,channel_id:S.selCh.id,mode:'multi',config:cf}));
+}
 function stopBetting(){if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'stop_betting',phone:S.selAcc,channel_id:S.selCh.id}));S.running=false;document.getElementById('runStatus').textContent='已停止'}
 
 function ubp(){
-    let p='';
-    if(S.mode==='kill'){
-        p=C.filter(function(c){return c!==S.killed}).map(function(c){return c+S.amts[c]}).join(' ');
+    var p=[];
+    if(document.getElementById('modeKill')?.checked){
+        p.push(C.filter(function(c){return c!==S.killed}).map(function(c){return c+S.amts[c]}).join(' '));
         document.getElementById('runKill').textContent=S.killed||'--';
     }
-    else if(S.mode==='extreme')p=S.exts.map(function(n){return n+'/'+(document.getElementById('extremeAmount')?.value||1000)}).join('\n');
-    else if(S.mode==='abc'){const b=[];if(document.getElementById('abcA').checked)b.push('A');if(document.getElementById('abcB').checked)b.push('B');if(document.getElementById('abcC').checked)b.push('C');const amt=document.getElementById('abcAmount')?.value||1000;p=b.map(function(x){return x+'球: 杀一码投9个号各'+amt}).join('\n')}
-    document.getElementById('betPreview').textContent=p||'--';
+    if(document.getElementById('modeAbc')?.checked){
+        var amt=document.getElementById('abcAmount')?.value||1000;
+        p.push('ABC杀码: 杀一码投9号各'+amt);
+    }
+    if(document.getElementById('modeExtreme')?.checked){
+        var amt=document.getElementById('extremeAmount')?.value||1000;
+        var parts=S.exts.map(function(n){return n+'/'+amt});
+        if(document.getElementById('extremeBaozi')?.checked)parts.push('豹子000-999各'+amt);
+        p.push(parts.join('\n'));
+    }
+    document.getElementById('betPreview').textContent=p.join('\n\n')||'--';
 }
 
-function log(t,m){const a=document.getElementById('logArea');a.innerHTML+=`<div class="l${t==='success'?'s':t==='error'?'e':t==='warning'?'w':'i'}">[${new Date().toLocaleTimeString()}] ${m}</div>`;a.scrollTop=a.scrollHeight}
+function log(t,m){var a=document.getElementById('logArea');a.innerHTML+='<div class="l'+(t==='success'?'s':t==='error'?'e':t==='warning'?'w':'i')+'">['+new Date().toLocaleTimeString()+'] '+m+'</div>';a.scrollTop=a.scrollHeight}
 
-document.addEventListener('DOMContentLoaded',()=>{lp();la();cws();ie();setInterval(getLatest,30000)});
+document.addEventListener('DOMContentLoaded',function(){lp();la();cws();ie();setInterval(getLatest,30000)});
 </script>
 </body>
 </html>
