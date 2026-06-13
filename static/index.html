@@ -274,7 +274,7 @@ function ubp(){
     if(document.getElementById('modeExtreme')?.checked){
         var amt=document.getElementById('extremeAmount')?.value||1000;
         var parts=S.exts.map(function(n){return n+'/'+amt});
-        if(document.getElementById('extremeBaozi')?.checked)parts.push('豹子000-999各'+amt);
+        if(document.getElementById('extremeBaozi')?.checked)parts.push('豹子'+amt);
         p.push(parts.join('\n'));
     }
     document.getElementById('betPreview').textContent=p.join('\n\n')||'--';
