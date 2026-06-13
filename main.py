@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""小鶴神 · 智投PC v8.0 - 500个Quantum杀组模型"""
+"""小鶴神 · 智投PC v8.1 - 500 Quantum杀组 + 强制轮换"""
 
 import asyncio, json, os, re, random, math
 from datetime import datetime
@@ -30,23 +30,22 @@ Config.STATIC_DIR.mkdir(exist_ok=True)
 Config.DATA_DIR.mkdir(exist_ok=True)
 Config.SESSIONS_DIR.mkdir(exist_ok=True)
 
-app = FastAPI(title="小鶴神 · 智投PC", version="8.0")
+app = FastAPI(title="小鶴神 · 智投PC", version="8.1")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 COMBOS = ["大单", "小单", "大双", "小双"]
 
-# ==================== 500个Quantum杀组模型 ====================
+# ==================== 500 Quantum杀组模型 ====================
 class QuantumPredictor:
     def __init__(self, model_id):
         random.seed(model_id)
         self.depth = random.randint(15, 45)
         self.weights = {
             'freq': random.uniform(0.1, 1.0), 'streak': random.uniform(0.1, 1.0),
-            'switch': random.uniform(0.1, 1.0), 'omission': random.uniform(0.1, 1.0),
-            'period': random.uniform(0.1, 1.0), 'wma': random.uniform(0.1, 1.0),
-            'pattern': random.uniform(0.1, 1.0), 'bayes': random.uniform(0.1, 1.0),
-            'golden': random.uniform(0.1, 1.0), 'noise': random.uniform(0.01, 0.15)
+            'omission': random.uniform(0.1, 1.0), 'wma': random.uniform(0.1, 1.0),
+            'pattern': random.uniform(0.1, 1.0), 'golden': random.uniform(0.1, 1.0),
+            'noise': random.uniform(0.01, 0.15)
         }
         self.bias = random.uniform(-0.2, 0.2)
         self.golden_step = random.choice([0.382, 0.618, 1.618])
@@ -329,7 +328,7 @@ async def hsb(cid,d):
     cm.bt[tk]=task
     await cm.send(cid,{"type":"betting_started","success":True})
 
-# ==================== 投注循环 ====================
+# ==================== 投注循环（强制轮换版） ====================
 async def bl(cid,ph,chid,modes,cfg,cl):
     last_qihao = None
     last_killed = None
@@ -337,6 +336,7 @@ async def bl(cid,ph,chid,modes,cfg,cl):
     mult = float(cfg.get("multiplier",2.0))
     max_loss = int(cfg.get("maxLoss",5))
     ctag = cfg.get("customTag","")
+    kill_history = []  # 记录最近杀的组合
 
     try:
         while True:
@@ -369,6 +369,18 @@ async def bl(cid,ph,chid,modes,cfg,cl):
 
             if "kill" in modes:
                 kill_target, rate, _ = mm.fbm(h)
+
+                # 记录杀组历史
+                kill_history.append(kill_target)
+                if len(kill_history) > 3: kill_history.pop(0)
+
+                # 连杀3期同一个，强制换
+                if len(kill_history) == 3 and len(set(kill_history)) == 1:
+                    other = [c for c in COMBOS if c != kill_target]
+                    kill_target = random.choice(other)
+                    kill_history = [kill_target]  # 重置记录
+                    await cm.send(cid,{"type":"bet_log","message":f"⚠ 连杀3期{kill_history[0]}，强制换杀:{kill_target}"})
+
                 last_killed = kill_target
                 bet_combos = [c for c in COMBOS if c != kill_target]
                 parts = [f"{c}{int(cfg.get('amounts',{}).get(c,10000)*cur_mult)}" for c in bet_combos]
@@ -408,5 +420,5 @@ async def hst(cid,d):
     await cm.send(cid,{"type":"betting_stopped","success":True})
 
 if __name__=="__main__":
-    print("小鶴神 · 智投PC v8.0 - 500 Quantum杀组")
+    print("小鶴神 · 智投PC v8.1")
     uvicorn.run(app,host=Config.HOST,port=Config.PORT)
