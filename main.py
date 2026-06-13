@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""小鶴神 · 智投PC v7.0 - 多模式同时下注 + 极值豹子"""
+"""小鶴神 · 智投PC v8.0 - 500个Quantum杀组模型"""
 
 import asyncio, json, os, re, random, math
 from datetime import datetime
@@ -30,10 +30,99 @@ Config.STATIC_DIR.mkdir(exist_ok=True)
 Config.DATA_DIR.mkdir(exist_ok=True)
 Config.SESSIONS_DIR.mkdir(exist_ok=True)
 
-app = FastAPI(title="小鶴神 · 智投PC", version="7.0")
+app = FastAPI(title="小鶴神 · 智投PC", version="8.0")
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+COMBOS = ["大单", "小单", "大双", "小双"]
+
+# ==================== 500个Quantum杀组模型 ====================
+class QuantumPredictor:
+    def __init__(self, model_id):
+        random.seed(model_id)
+        self.depth = random.randint(15, 45)
+        self.weights = {
+            'freq': random.uniform(0.1, 1.0), 'streak': random.uniform(0.1, 1.0),
+            'switch': random.uniform(0.1, 1.0), 'omission': random.uniform(0.1, 1.0),
+            'period': random.uniform(0.1, 1.0), 'wma': random.uniform(0.1, 1.0),
+            'pattern': random.uniform(0.1, 1.0), 'bayes': random.uniform(0.1, 1.0),
+            'golden': random.uniform(0.1, 1.0), 'noise': random.uniform(0.01, 0.15)
+        }
+        self.bias = random.uniform(-0.2, 0.2)
+        self.golden_step = random.choice([0.382, 0.618, 1.618])
+        self.pattern_len = random.choice([2, 3])
+        self.model_id = model_id
+        self.id_half = model_id % 2 == 0
+
+    def predict(self, history):
+        combos = ['大单', '小单', '大双', '小双']
+        available = history[:self.depth] if len(history) >= self.depth else history
+        if not available: return random.choice(combos)
+        scores = {c: 0.0 for c in combos}
+        freqs = Counter(available)
+        for c in combos:
+            scores[c] += (freqs[c] / len(available)) * self.weights['freq']
+        current_streak = 0; sc = available[0]
+        for x in available:
+            if x == sc: current_streak += 1
+            else: break
+        scores[sc] += (current_streak * 0.2) * self.weights['streak']
+        for c in combos:
+            omission = 0
+            for x in available:
+                if x != c: omission += 1
+                else: break
+            scores[c] -= (omission * 0.1) * self.weights['omission']
+        for i, x in enumerate(available):
+            weight = (len(available) - i) / len(available)
+            scores[x] += weight * self.weights['wma']
+        if len(available) > self.pattern_len + 1:
+            cp = tuple(available[:self.pattern_len])
+            pmc = Counter()
+            for i in range(1, len(available) - self.pattern_len):
+                window = tuple(available[i:i+self.pattern_len])
+                if window == cp:
+                    nv = available[i-1]; pmc[nv] += 1
+            for c, count in pmc.items():
+                scores[c] += (count / (sum(pmc.values()) + 1e-5)) * self.weights['pattern']
+        gi = int(len(available) * (1 / self.golden_step)) % len(available)
+        scores[available[gi]] += 0.5 * self.weights['golden']
+        for c in combos:
+            noise = random.normalvariate(0, self.weights['noise'])
+            scores[c] += noise + self.bias
+        if self.id_half: return min(scores, key=scores.get)
+        else: return max(scores, key=scores.get)
+
+
+class ModelManager:
+    def __init__(self):
+        self.models = [QuantumPredictor(i) for i in range(1, 501)]
+
+    def fbm(self, history):
+        combos_only = [h.get('combo', '') for h in history]
+        results = []
+        total = min(50, len(combos_only) - 1)
+        if total < 5: return random.choice(COMBOS), 0, 0
+
+        for model in self.models:
+            win = 0
+            for i in range(1, total + 1):
+                try:
+                    pred = model.predict(combos_only[i:])
+                    actual = combos_only[i-1]
+                    if actual and actual != pred: win += 1
+                except: continue
+            rate = win / total if total > 0 else 0
+            results.append((model.model_id, rate, model.predict(combos_only)))
+
+        results.sort(key=lambda x: x[1], reverse=True)
+        top5 = results[:5]
+        best = random.choice(top5)
+        return best[2], best[1], best[0]
+
+mm = ModelManager()
+
+# ==================== ABC杀码 ====================
 KILL_MODELS = {}
 def create_advanced_predictor(depth, offset, weight, formula_type, step):
     def predictor(history_balls):
@@ -69,110 +158,7 @@ class HighWinRateManager:
 
 abc_manager = HighWinRateManager()
 
-COMBOS = ["大单", "小单", "大双", "小双"]
-ALL_MODELS = {}
-
-def old_slayer_factory(hd, cfg):
-    f = ["大单","小单","大双","小双"]
-    hs = [h.get("combo",h.get("combination","小单")) for h in hd[:cfg['depth']]]
-    c = Counter(hs)
-    if cfg['type']=="FREQ": t = max(f,key=lambda x:c.get(x,0)) if cfg['bias']=="HOT" else min(f,key=lambda x:c.get(x,0))
-    elif cfg['type']=="GAP": li = f.index(hs[0]) if hs else 0; t = f[(li+cfg['offset'])%4]
-    else: n = int(hd[0].get('nbr',0)) if hd else 0; t = f[(n*cfg['m']+cfg['s'])%4]
-    return [t]
-
-for i in range(1,301):
-    c = {'depth':10+(i%90),'type':"FREQ" if i<=100 else ("GAP" if i<=200 else "MATH"),'bias':"HOT" if i%2==0 else "COLD",'offset':(i*7)%4,'m':(i*13)%17,'s':i%5}
-    ALL_MODELS[i] = {"func":lambda h,cc=c: old_slayer_factory(h,cc),"info":{"id":i,"name":f"杀组 M{i}","type":"杀组"}}
-
-NF = ["大单","小单","大双","小双"]
-def sdh(hd,m,d):
-    h = [x.get("combo",x.get("combination","小单")) for x in hd[-d:]] if hd else []
-    if not h: return [random.choice(NF)]
-    if m==0: return h
-    elif m==1: return h[::-1]
-    elif m==2: return h[::2] if len(h)>=2 else h
-    elif m==3: return h[1::2] if len(h)>=2 else h
-    else: return h[len(h)//2:]
-
-def cfh(h,ft):
-    r = {f:0 for f in NF}
-    if not h: return r
-    if ft==0: [r.update({x:r.get(x,0)+1}) for x in h]
-    elif ft==1:
-        la = {f:-1 for f in NF}
-        for i,x in enumerate(h): la[x]=i
-        for f in NF: r[f]=len(h)-la[f]
-    elif ft==2:
-        for i in range(1,len(h)):
-            if h[i]==h[i-1]: r[h[i]]=r.get(h[i],0)+1
-    elif ft==3:
-        for i in range(1,len(h)):
-            if h[i]!=h[i-1]: r[h[i]]=r.get(h[i],0)+1
-    return r
-
-def nkm(hd,c,mid):
-    d = sdh(hd,c["slice"],c["depth"]); fe = cfh(d,c["feature"])
-    sc = {}
-    for i,f in enumerate(NF):
-        ba = fe[f]; no = math.sin(mid*0.31+i)+math.cos(mid*0.17*(i+1))+((mid%7)-3)*0.1
-        if c["mode"]==0: sc[f]=ba+no
-        elif c["mode"]==1: sc[f]=-ba+no
-        else: sc[f]=math.log(ba+1)+no
-    return [min(sc,key=sc.get)]
-
-for i in range(1,301):
-    mid=i+300; c={"depth":10+(i%90),"slice":i%5,"feature":i%4,"mode":i%3}
-    ALL_MODELS[mid]={"func":lambda h,cc=c,m=mid: nkm(h,cc,m),"info":{"id":mid,"name":f"新杀组 M{i}","type":"杀组"}}
-
-def nkv3(h,mid):
-    f=["大单","小单","大双","小双"]
-    hh=[x.get("combo",x.get("combination","小单")) for x in h[-30:]] if h else f
-    c=Counter(hh); idx=mid%5
-    if idx==0: t=max(f,key=lambda x:c.get(x,0))
-    elif idx==1: t=min(f,key=lambda x:c.get(x,0))
-    elif idx==2: t={"大单":"小双","小双":"大单","大双":"小单","小单":"大双"}.get(hh[0] if hh else "小单","小单")
-    elif idx==3: n=int(h[0].get('nbr',0)) if h else 0; t=f[n%4]
-    else: total=sum(c.values())+1; t=min(f,key=lambda x:(c.get(x,0)+1)/total)
-    return [t]
-
-for i in range(1,101):
-    mid=i+600; ALL_MODELS[mid]={"func":lambda h,m=mid: nkv3(h,m),"info":{"id":mid,"name":f"V3杀组 M{i}","type":"杀组"}}
-
-def dms(h,c):
-    f=["大单","小单","大双","小双"]
-    hs=[h.get("combination",h.get("combo","小单")) for h in h[:c['depth']]]
-    if not hs: return ["小单"]
-    cnt={f:hs.count(f) for f in f}
-    if c['type']=="FREQ_BIAS": t=max(f,key=lambda x:cnt[x]) if c['bias']=="HOT" else min(f,key=lambda x:cnt[x])
-    elif c['type']=="GAP_SHIFT": li=f.index(hs[0]) if hs[0] in f else 0; t=f[(li+c['offset'])%4]
-    else: ns=int(h[0].get('nbr',0)) if str(h[0].get('nbr','')).isdigit() else 1; t=f[(ns*c['m']+c['s'])%4]
-    return [t]
-
-for idx in range(1,501):
-    mid=2000+idx
-    if idx<=180: c={'type':"FREQ_BIAS",'depth':8+(idx%45),'bias':"HOT" if (idx*7)%2==0 else "COLD",'offset':0,'m':0,'s':0}
-    elif idx<=360: c={'type':"GAP_SHIFT",'depth':12+(idx%60),'bias':"NONE",'offset':(idx*13)%4,'m':0,'s':0}
-    else: c={'type':"MATH_WAVE",'depth':5+(idx%30),'bias':"NONE",'offset':0,'m':(idx*17)%23+1,'s':(idx*3)%7}
-    ALL_MODELS[mid]={"func":lambda h,cc=c: dms(h,cc),"info":{"id":mid,"name":f"黄金矩阵杀组 M{mid}","type":"杀组"}}
-
-class ModelManager:
-    def __init__(self): self.am=ALL_MODELS; self.km=[i for i in range(1,701)]+[i for i in range(2001,2501)]
-    def fbm(self,h):
-        if len(h)<10: return "小双",0,0
-        r=[]; t=min(100,len(h)-1)
-        for mid in self.km:
-            md=self.am.get(mid)
-            if not md: continue
-            w=sum(1 for i in range(1,t) if (lambda p,a: a and a!=p[0])(md["func"](h[i:]),h[i-1].get("combo","")))
-            rate=w/t if t>0 else 0; r.append((mid,rate,md["func"](h)[0]))
-        r.sort(key=lambda x:x[1],reverse=True)
-        top3=r[:3] if len(r)>=3 else r
-        best=random.choice(top3) if top3 else (0,0,"小双")
-        return best[2],best[1],best[0]
-
-mm = ModelManager()
-
+# ==================== 连接管理 ====================
 class CM:
     def __init__(self): self.conn={}; self.cli={}; self.ls={}; self.bt={}
     async def connect(self,w,c): await w.accept(); self.conn[c]=w
@@ -334,8 +320,7 @@ async def hgp(cid,d):
 
 async def hsb(cid,d):
     ph=d.get("phone",""); chid=d.get("channel_id","")
-    cfg=d.get("config",{})
-    modes=cfg.get("modes",["kill"])
+    cfg=d.get("config",{}); modes=cfg.get("modes",["kill"])
     cl=cm.gc(ph)
     if not cl: await cm.send(cid,{"type":"betting_started","success":False,"error":"未登录"}); return
     tk=f"{ph}_{chid}"
@@ -344,7 +329,7 @@ async def hsb(cid,d):
     cm.bt[tk]=task
     await cm.send(cid,{"type":"betting_started","success":True})
 
-# ==================== 多模式投注循环 ====================
+# ==================== 投注循环 ====================
 async def bl(cid,ph,chid,modes,cfg,cl):
     last_qihao = None
     last_killed = None
@@ -360,7 +345,6 @@ async def bl(cid,ph,chid,modes,cfg,cl):
             latest = h[0]; cur_qihao = latest['qihao']
             if cur_qihao == last_qihao: await asyncio.sleep(3); continue
 
-            # 判断上期输赢（仅杀组）
             if last_qihao is not None and last_killed is not None and "kill" in modes:
                 actual_combo = latest.get('combo','')
                 if actual_combo == last_killed:
@@ -383,7 +367,6 @@ async def bl(cid,ph,chid,modes,cfg,cl):
             last_qihao = cur_qihao
             messages = []
 
-            # 杀组
             if "kill" in modes:
                 kill_target, rate, _ = mm.fbm(h)
                 last_killed = kill_target
@@ -392,33 +375,23 @@ async def bl(cid,ph,chid,modes,cfg,cl):
                 messages.append(" ".join(parts))
                 await cm.send(cid,{"type":"bet_log","message":f"杀组: 杀:{kill_target} 胜率:{rate*100:.1f}% 倍率:{cur_mult:.1f}x"})
 
-            # ABC杀码（不倍投）
             if "abc" in modes:
                 preds = abc_manager.get_all_predictions(h)
-                balls = cfg.get("abcBalls",["A"])
-                am = int(cfg.get("abcAmount",1000))
+                balls = cfg.get("abcBalls",["A"]); am = int(cfg.get("abcAmount",1000))
                 all_parts = []
                 for ball in balls:
-                    info = preds.get(ball,{})
-                    bet_nums = info.get('bet_numbers',[])
-                    if bet_nums:
-                        all_parts.extend([f"{ball.lower()}{n}/{am}" for n in bet_nums])
-                if all_parts:
-                    messages.append("\n".join(all_parts))
+                    info = preds.get(ball,{}); bet_nums = info.get('bet_numbers',[])
+                    if bet_nums: all_parts.extend([f"{ball.lower()}{n}/{am}" for n in bet_nums])
+                if all_parts: messages.append("\n".join(all_parts))
 
-            # 追极值+豹子（不倍投）
             if "extreme" in modes:
-                extremes = cfg.get("extremeNumbers",[])
-                am = int(cfg.get("extremeAmount",1000))
+                extremes = cfg.get("extremeNumbers",[]); am = int(cfg.get("extremeAmount",1000))
                 parts = [f"{n}/{am}" for n in extremes]
-                if cfg.get("extremeBaozi",False):
-                    parts.append(f"豹子/{am}")
-                if parts:
-                    messages.append("\n".join(parts))
+                if cfg.get("extremeBaozi",False): parts.append(f"豹子/{am}")
+                if parts: messages.append("\n".join(parts))
 
             msg = "\n".join(messages)
-            if ctag and msg:
-                msg += "\n" + ctag
+            if ctag and msg: msg += "\n" + ctag
             if msg:
                 try:
                     await cl.send_message(chid,msg)
@@ -435,5 +408,5 @@ async def hst(cid,d):
     await cm.send(cid,{"type":"betting_stopped","success":True})
 
 if __name__=="__main__":
-    print("小鶴神 · 智投PC v7.0")
+    print("小鶴神 · 智投PC v8.0 - 500 Quantum杀组")
     uvicorn.run(app,host=Config.HOST,port=Config.PORT)
