@@ -2,148 +2,285 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>小鶴神 · 多模型智投PC</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+    <title>小鶴神 · 多模型智投</title>
     <style>
-        :root{--bg:#0a0e17;--card:#141b24;--border:#1e2d3d;--text:#e0e6ed;--text2:#8899aa;--pri:#3b82f6;--suc:#10b981;--sucb:rgba(16,185,129,.15);--dan:#ef4444;--danb:rgba(239,68,68,.15);--war:#f59e0b;--warb:rgba(245,158,11,.15);--pur:#8b5cf6;--purb:rgba(139,92,246,.15);--r:10px;--rs:6px}
-        *{margin:0;padding:0;box-sizing:border-box}
-        body{font-family:'Segoe UI',-apple-system,sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
-        .topbar{background:var(--card);border-bottom:1px solid var(--border);padding:10px 14px;display:flex;align-items:center;gap:10px;position:sticky;top:0;z-index:100}
-        .back-btn{background:none;border:1px solid var(--border);color:var(--text);padding:6px 12px;border-radius:var(--rs);cursor:pointer;font-size:13px}
-        .logo{font-size:16px;font-weight:700;color:var(--pri);flex:1}
-        .acct{display:flex;align-items:center;gap:5px;padding:5px 10px;background:var(--bg);border-radius:20px;border:1px solid var(--border);font-size:11px}
-        .acct .dot{width:7px;height:7px;border-radius:50%;background:var(--dan)}
-        .acct .dot.on{background:var(--suc);animation:pulse 2s infinite}
-        @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
-        .main{max-width:800px;margin:0 auto;padding:12px 10px}
-        .card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:16px;margin-bottom:14px}
-        .ct{font-size:15px;font-weight:600;margin-bottom:12px;padding-bottom:8px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:6px}
-        .fg{margin-bottom:10px}
-        .fl{display:block;font-size:12px;color:var(--text2);margin-bottom:4px;font-weight:500}
-        .fi,.fs{width:100%;padding:10px 12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--rs);color:var(--text);font-size:14px;font-family:inherit}
-        .fi:focus,.fs:focus{outline:none;border-color:var(--pri)}
-        .btn{padding:10px 16px;border:none;border-radius:var(--rs);font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;justify-content:center;gap:5px}
-        .btn:disabled{opacity:.5;pointer-events:none}
-        .bp{background:var(--pri);color:#fff;width:100%;padding:12px}
-        .bs{background:var(--suc);color:#fff;width:100%;padding:12px}
-        .bd{background:var(--dan);color:#fff;width:100%;padding:12px}
-        .bo{background:none;border:1px solid var(--border);color:var(--text)}
-        .bsm{padding:5px 10px;font-size:11px}
-        .hidden{display:none!important}
-        .tag{display:inline-block;padding:2px 7px;border-radius:10px;font-size:10px;font-weight:600}
-        .ts{background:var(--sucb);color:var(--suc)}
-        .td{background:var(--danb);color:var(--dan)}
-        .lb{display:flex;align-items:center;gap:8px;padding:10px 14px;background:var(--card);border-radius:var(--rs);margin-bottom:14px;border:1px solid var(--border);font-size:13px;flex-wrap:wrap}
-        .lb .res{font-size:18px;font-weight:700}
-        .lb .res.big{color:var(--dan)}
-        .lb .res.small{color:var(--suc)}
-        .mt{display:flex;gap:6px;margin-bottom:14px}
-        .mtab{flex:1;padding:10px 6px;text-align:center;background:var(--bg);border:2px solid var(--border);border-radius:var(--rs);cursor:pointer;font-size:12px;font-weight:600}
-        .mtab.act{border-color:var(--pri);background:rgba(59,130,246,.1);color:var(--pri)}
-        .cg{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:12px}
-        .cc{padding:12px;background:var(--bg);border:2px solid var(--border);border-radius:var(--rs);cursor:pointer;text-align:center;position:relative}
-        .cc.bet{border-color:var(--suc);background:rgba(16,185,129,.06)}
-        .cc.kill{border-color:var(--dan);background:rgba(239,68,68,.08);opacity:.7}
-        .cc .cn{font-weight:700;font-size:15px}
-        .cc .co{font-size:11px;color:var(--text2)}
-        .cc .ctag{position:absolute;top:6px;right:8px;font-size:10px}
-        .cc .ca{margin-top:6px;font-size:13px;font-weight:600}
-        .cc.bet .ca{color:var(--suc)}
-        .cc.kill .ca{color:var(--dan)}
-        .ar{display:flex;align-items:center;gap:8px;padding:10px;background:var(--bg);border-radius:var(--rs);margin-bottom:6px;border:1px solid var(--border)}
-        .ar .cl{width:45px;font-weight:600;font-size:13px}
-        .ar input{flex:1;padding:8px;background:var(--card);border:1px solid var(--border);border-radius:var(--rs);color:var(--text);font-size:14px;text-align:center;font-family:inherit}
-        .ar input:focus{border-color:var(--pri)}
-        .ob{font-size:10px;padding:2px 6px;border-radius:8px}
-        .ol{background:var(--warb);color:var(--war)}
-        .oh{background:var(--purb);color:var(--pur)}
-        .pl{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
-        .pi{padding:6px 12px;background:var(--bg);border:1px solid var(--border);border-radius:var(--rs);cursor:pointer;font-size:12px}
-        .wb{background:var(--bg);border:1px solid var(--pri);border-radius:var(--rs);padding:10px 14px;margin:10px 0;display:flex;align-items:center;gap:8px;font-size:13px;flex-wrap:wrap}
-        .wb .rate{font-size:22px;font-weight:700;color:var(--suc)}
-        .la{background:#0a0a0a;border:1px solid var(--border);border-radius:var(--rs);padding:10px;max-height:180px;overflow-y:auto;font-family:monospace;font-size:11px;line-height:1.6}
-        .ls{color:var(--suc)}.le{color:var(--dan)}.li{color:var(--pri)}.lw{color:var(--war)}
-        .tip{font-size:11px;color:var(--text2);padding:8px 10px;background:var(--bg);border-radius:var(--rs);border-left:3px solid var(--pri);margin-top:8px}
-        .tc{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-        .eg{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
-        .ei{padding:8px 12px;background:var(--bg);border:2px solid var(--border);border-radius:var(--rs);cursor:pointer;font-weight:600;font-size:13px}
-        .ei.sel{border-color:var(--pri);background:rgba(59,130,246,.12);color:var(--pri)}
-        .ac{display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap}
-        .ack{display:flex;align-items:center;gap:4px;font-size:13px;cursor:pointer}
-        .ack input{width:16px;height:16px;accent-color:var(--pri)}
+        :root {
+            --bg: #000000;
+            --card: #1c1c1e;
+            --card2: #2c2c2e;
+            --sep: #38383a;
+            --text: #ffffff;
+            --text2: #8e8e93;
+            --blue: #0a84ff;
+            --green: #30d158;
+            --red: #ff453a;
+            --orange: #ff9f0a;
+            --purple: #bf5af2;
+            --radius: 16px;
+            --radius-sm: 12px;
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: var(--bg); color: var(--text); min-height: 100vh;
+            -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale;
+        }
+        
+        /* 状态栏占位 */
+        .status-bar { height: 54px; }
+        
+        /* 导航栏 */
+        .navbar {
+            position: sticky; top: 0; z-index: 100;
+            background: rgba(0,0,0,0.85); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            padding: 12px 16px; display: flex; align-items: center; justify-content: space-between;
+            border-bottom: 0.5px solid var(--sep);
+        }
+        .nav-title { font-size: 18px; font-weight: 600; letter-spacing: -0.3px; }
+        .nav-title span { color: var(--blue); }
+        .nav-status {
+            font-size: 12px; color: var(--text2); display: flex; align-items: center; gap: 6px;
+        }
+        .nav-status .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); }
+        .nav-status .dot.on { background: var(--green); }
+        
+        /* 主容器 */
+        .main { max-width: 480px; margin: 0 auto; padding: 0 16px 40px; }
+        
+        /* 卡片 */
+        .card {
+            background: var(--card); border-radius: var(--radius); padding: 20px;
+            margin-bottom: 12px;
+        }
+        .card-header { font-size: 15px; font-weight: 600; margin-bottom: 16px; }
+        
+        /* 开奖条 */
+        .ticker {
+            background: var(--card2); border-radius: var(--radius-sm); padding: 14px 16px;
+            margin-bottom: 12px; display: flex; align-items: center; gap: 12px;
+        }
+        .ticker-qihao { font-size: 13px; color: var(--text2); }
+        .ticker-result {
+            font-size: 20px; font-weight: 700; letter-spacing: 1px;
+            flex: 1; text-align: center;
+        }
+        .ticker-sum { font-size: 12px; color: var(--text2); }
+        
+        /* 输入框 */
+        .input-group { margin-bottom: 14px; }
+        .input-label { font-size: 12px; color: var(--text2); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .input {
+            width: 100%; padding: 14px 16px; background: var(--card2); border: 1px solid var(--sep);
+            border-radius: var(--radius-sm); color: var(--text); font-size: 16px;
+            font-family: inherit; outline: none; transition: border-color 0.2s;
+        }
+        .input:focus { border-color: var(--blue); }
+        .input::placeholder { color: #555; }
+        
+        /* 按钮 */
+        .btn {
+            width: 100%; padding: 16px; border: none; border-radius: var(--radius-sm);
+            font-size: 16px; font-weight: 600; font-family: inherit; cursor: pointer;
+            transition: all 0.15s; letter-spacing: -0.2px;
+        }
+        .btn:active { transform: scale(0.97); opacity: 0.9; }
+        .btn-primary { background: var(--blue); color: #fff; }
+        .btn-success { background: var(--green); color: #000; }
+        .btn-danger { background: rgba(255,69,58,0.15); color: var(--red); }
+        .btn-ghost { background: transparent; color: var(--blue); width: auto; padding: 8px 12px; font-size: 14px; }
+        
+        /* 模式选择 */
+        .segmented {
+            display: flex; background: var(--card2); border-radius: 10px; padding: 2px;
+            margin-bottom: 18px;
+        }
+        .seg-btn {
+            flex: 1; padding: 10px; text-align: center; border-radius: 8px;
+            font-size: 13px; font-weight: 500; cursor: pointer; transition: all 0.2s;
+            color: var(--text2); border: none; background: transparent; font-family: inherit;
+        }
+        .seg-btn.active { background: #48484a; color: var(--text); font-weight: 600; }
+        
+        /* 组合网格 */
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+        .combo-box {
+            background: var(--card2); border-radius: var(--radius-sm); padding: 14px;
+            text-align: center; cursor: pointer; border: 2px solid transparent; transition: all 0.2s;
+        }
+        .combo-box.bet { border-color: var(--green); background: rgba(48,209,88,0.08); }
+        .combo-box.killed { border-color: var(--red); background: rgba(255,69,58,0.08); opacity: 0.7; }
+        .combo-box .name { font-size: 16px; font-weight: 700; }
+        .combo-box .odds { font-size: 11px; color: var(--text2); margin-top: 2px; }
+        .combo-box .amt { font-size: 13px; font-weight: 500; margin-top: 4px; }
+        .combo-box.bet .amt { color: var(--green); }
+        .combo-box.killed .amt { color: var(--red); }
+        
+        /* 金额行 */
+        .amt-row {
+            display: flex; align-items: center; gap: 10px; padding: 10px 14px;
+            background: var(--card2); border-radius: var(--radius-sm); margin-bottom: 6px;
+        }
+        .amt-row .label { font-weight: 600; font-size: 14px; width: 42px; }
+        .amt-row .odds-badge { font-size: 10px; padding: 3px 8px; border-radius: 20px; font-weight: 600; }
+        .amt-row .odds-low { background: rgba(255,159,10,0.15); color: var(--orange); }
+        .amt-row .odds-high { background: rgba(191,90,242,0.15); color: var(--purple); }
+        .amt-row input {
+            flex: 1; padding: 10px; background: transparent; border: none;
+            color: var(--text); font-size: 16px; text-align: right; font-family: inherit;
+            outline: none;
+        }
+        .amt-row input::placeholder { color: #555; }
+        
+        /* 极值 */
+        .chip-row { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+        .chip {
+            padding: 8px 14px; background: var(--card2); border-radius: 20px;
+            font-size: 13px; font-weight: 600; cursor: pointer; border: 2px solid transparent;
+            transition: all 0.15s;
+        }
+        .chip.selected { border-color: var(--blue); background: rgba(10,132,255,0.1); color: var(--blue); }
+        
+        /* 胜率卡片 */
+        .stat-card {
+            background: var(--card2); border-radius: var(--radius-sm); padding: 14px;
+            display: flex; align-items: center; gap: 12px; margin: 10px 0;
+        }
+        .stat-card .rate { font-size: 28px; font-weight: 700; color: var(--green); }
+        .stat-card .info { font-size: 12px; color: var(--text2); }
+        
+        /* 日志 */
+        .log-area {
+            background: #111; border-radius: var(--radius-sm); padding: 12px;
+            max-height: 160px; overflow-y: auto; font-family: 'SF Mono', 'Menlo', monospace;
+            font-size: 11px; line-height: 1.7; color: #aaa;
+        }
+        .log-green { color: var(--green); } .log-red { color: var(--red); }
+        .log-blue { color: var(--blue); } .log-orange { color: var(--orange); }
+        
+        .hidden { display: none !important; }
+        .tag { font-size: 10px; padding: 2px 8px; border-radius: 10px; font-weight: 600; }
+        .tag-green { background: rgba(48,209,88,0.15); color: var(--green); }
+        .tag-red { background: rgba(255,69,58,0.15); color: var(--red); }
+        
+        .tip {
+            font-size: 12px; color: var(--text2); padding: 10px 14px;
+            background: var(--card2); border-radius: var(--radius-sm); margin-top: 8px;
+        }
+        .flex-row { display: flex; gap: 10px; }
+        .checkbox-row { display: flex; align-items: center; gap: 8px; font-size: 14px; cursor: pointer; }
+        .checkbox-row input { width: 18px; height: 18px; accent-color: var(--blue); }
     </style>
 </head>
 <body>
 
-<div class="topbar">
-    <button class="back-btn hidden" id="backBtn" onclick="goBack()">← 返回</button>
-    <div class="logo">小鶴神<span> · 多模型智投PC</span></div>
-    <div class="acct"><div class="dot" id="statusDot"></div><span id="statusText">未登录</span></div>
+<div class="status-bar"></div>
+
+<div class="navbar">
+    <div class="nav-title">🦅 小鶴神<span> · 多模型智投PC</span></div>
+    <div class="nav-status"><div class="dot" id="statusDot"></div><span id="statusText">未连接</span></div>
 </div>
 
 <div class="main">
-    <div class="lb"><span>📊</span><span id="latestQihao">加载中...</span><span class="res" id="latestResult">--</span><span style="font-size:11px;color:var(--text2)" id="latestSum"></span></div>
 
-    <div class="card" id="panel-login"><div class="ct">🔐 登录Telegram</div>
-        <div class="fg"><label class="fl">手机号</label><input type="tel" class="fi" id="phoneInput" placeholder="+8613800138000" value="+86"></div>
-        <div id="codeSection" class="hidden"><div class="fg"><label class="fl">验证码</label><input type="text" class="fi" id="codeInput" placeholder="6位验证码" maxlength="6" inputmode="numeric"></div></div>
-        <div id="passwordSection" class="hidden"><div class="fg"><label class="fl">两步验证密码</label><input type="password" class="fi" id="passwordInput" placeholder="输入密码"></div></div>
-        <button class="btn bp" id="btnLogin" onclick="handleLogin()">📨 发送验证码</button>
+    <!-- 开奖条 -->
+    <div class="ticker">
+        <span class="ticker-qihao" id="latestQihao">--</span>
+        <span class="ticker-result" id="latestResult" style="color:var(--orange)">--</span>
+        <span class="ticker-sum" id="latestSum"></span>
     </div>
 
-    <div class="card hidden" id="panel-channels"><div class="ct">💬 选择频道</div>
-        <div class="fg"><label class="fl">账号</label><select class="fs" id="accountSelect" onchange="onAccountChange()"></select></div>
-        <div class="fg"><label class="fl">频道</label><select class="fs" id="channelSelect"></select><button class="btn bo bsm" style="margin-top:6px" onclick="refreshChannels()">🔄 刷新</button></div>
-        <button class="btn bp" onclick="confirmChannel()" id="btnConfirmChannel" disabled>✅ 确认</button>
+    <!-- 登录 -->
+    <div class="card" id="panel-login">
+        <div class="card-header">登录 Telegram</div>
+        <div class="input-group"><label class="input-label">手机号</label><input class="input" id="phoneInput" placeholder="+8613800138000" value="+86" type="tel"></div>
+        <div id="codeSection" class="hidden"><div class="input-group"><label class="input-label">验证码</label><input class="input" id="codeInput" placeholder="6位验证码" maxlength="6" inputmode="numeric"></div></div>
+        <div id="pwdSection" class="hidden"><div class="input-group"><label class="input-label">两步验证密码</label><input class="input" id="passwordInput" type="password" placeholder="输入密码"></div></div>
+        <button class="btn btn-primary" id="btnLogin" onclick="handleLogin()">发送验证码</button>
     </div>
 
-    <div class="card hidden" id="panel-settings"><div class="ct">🎯 投注设置</div>
-        <!-- 多模式选择 -->
-        <div class="fg">
-            <label class="fl">启用模式（可多选）</label>
-            <div style="display:flex;gap:12px;flex-wrap:wrap">
-                <label class="ack"><input type="checkbox" id="modeKill" checked onchange="toggleModePanels()"> 杀组</label>
-                <label class="ack"><input type="checkbox" id="modeAbc" onchange="toggleModePanels()"> ABC杀码</label>
-                <label class="ack"><input type="checkbox" id="modeExtreme" onchange="toggleModePanels()"> 追极值</label>
+    <!-- 频道 -->
+    <div class="card hidden" id="panel-channels">
+        <div class="card-header">选择频道</div>
+        <div class="input-group"><label class="input-label">账号</label><select class="input" id="accountSelect" onchange="onAccountChange()"></select></div>
+        <div class="input-group"><label class="input-label">频道</label><select class="input" id="channelSelect"></select></div>
+        <button class="btn btn-ghost" onclick="refreshChannels()">刷新列表</button>
+        <button class="btn btn-primary" onclick="confirmChannel()" id="btnConfirmChannel" disabled>确认选择</button>
+    </div>
+
+    <!-- 设置 -->
+    <div class="card hidden" id="panel-settings">
+        <div class="card-header">投注设置</div>
+        <div class="segmented">
+            <button class="seg-btn active" onclick="switchMode('kill')" id="tab-kill">杀组</button>
+            <button class="seg-btn" onclick="switchMode('abc')" id="tab-abc">ABC</button>
+            <button class="seg-btn" onclick="switchMode('extreme')" id="tab-extreme">极值</button>
+        </div>
+
+        <!-- 模式多选 -->
+        <div class="flex-row" style="margin-bottom:14px">
+            <label class="checkbox-row"><input type="checkbox" id="modeKill" checked onchange="togglePanels()"> 杀组</label>
+            <label class="checkbox-row"><input type="checkbox" id="modeAbc" onchange="togglePanels()"> ABC</label>
+            <label class="checkbox-row"><input type="checkbox" id="modeExtreme" onchange="togglePanels()"> 极值</label>
+        </div>
+
+        <div id="panel-kill">
+            <div class="input-label">杀组预测 <button class="btn btn-ghost" onclick="refreshPrediction()">刷新</button></div>
+            <div class="grid-2" id="comboCards"></div>
+            <div class="stat-card" id="killWinrate" style="display:none">
+                <span>胜率</span><span class="rate" id="killRate">--%</span><span class="info" id="killModelInfo"></span>
+            </div>
+            <div class="input-label" style="margin-top:12px">金额设置</div>
+            <div id="amountInputs"></div>
+            <div id="planSection" style="margin-top:10px">
+                <div class="chip-row" id="planList"></div>
+                <button class="btn btn-ghost" onclick="savePlan()">保存当前方案</button>
             </div>
         </div>
 
-        <!-- 杀组 -->
-        <div id="panel-kill-mode">
-            <div class="fl" style="margin-top:10px">杀组预测（模型自动） <button class="btn bo bsm" onclick="refreshPrediction()">🔄 刷新</button></div>
-            <div class="cg" id="comboCards"></div>
-            <div class="wb" id="killWinrate" style="display:none"><span>📈 模型胜率:</span><span class="rate" id="killRate">--%</span><span style="font-size:11px;color:var(--text2)" id="killModelInfo"></span></div>
-            <div class="fl" style="margin-top:8px">预设金额</div><div id="amountInputs"></div>
-            <div id="planSection" class="fg" style="margin-top:10px"><label class="fl">已保存方案</label><div class="pl" id="planList"></div><button class="btn bo bsm" onclick="savePlan()">💾 保存当前为方案</button></div>
-        </div>
-
-        <!-- ABC杀码 -->
-        <div id="panel-abc-mode" class="hidden">
-            <div class="fl" style="margin-top:10px">ABC杀码预测</div>
-            <div class="ac"><label class="ack"><input type="checkbox" id="abcA" checked onchange="refreshPrediction()"> A球</label><label class="ack"><input type="checkbox" id="abcB" onchange="refreshPrediction()"> B球</label><label class="ack"><input type="checkbox" id="abcC" onchange="refreshPrediction()"> C球</label><button class="btn bo bsm" onclick="refreshPrediction()">🔄 刷新</button></div>
+        <div id="panel-abc" class="hidden">
+            <div class="flex-row" style="margin-bottom:10px">
+                <label class="checkbox-row"><input type="checkbox" id="abcA" checked onchange="refreshPrediction()"> A</label>
+                <label class="checkbox-row"><input type="checkbox" id="abcB" onchange="refreshPrediction()"> B</label>
+                <label class="checkbox-row"><input type="checkbox" id="abcC" onchange="refreshPrediction()"> C</label>
+                <button class="btn btn-ghost" onclick="refreshPrediction()">刷新</button>
+            </div>
             <div id="abcResults"></div>
-            <div class="fg"><label class="fl">每个号码金额</label><input type="number" class="fi" id="abcAmount" value="1000" min="1"></div>
+            <div class="input-group"><label class="input-label">每号金额</label><input class="input" id="abcAmount" value="1000" type="number"></div>
         </div>
 
-        <!-- 追极值 -->
-        <div id="panel-extreme-mode" class="hidden">
-            <div class="fl" style="margin-top:10px">选择极值号码</div>
-            <div class="eg" id="extremeGrid"></div>
-            <div class="fg"><label class="fl">每个号码金额</label><input type="number" class="fi" id="extremeAmount" value="1000" min="1"></div>
-            <label class="ack" style="margin-top:6px"><input type="checkbox" id="extremeBaozi"> 豹子 </label>
+        <div id="panel-extreme" class="hidden">
+            <div class="input-label">极值号码</div>
+            <div class="chip-row" id="extremeGrid"></div>
+            <div class="input-group"><label class="input-label">每号金额</label><input class="input" id="extremeAmount" value="1000" type="number"></div>
+            <label class="checkbox-row" style="margin-top:6px"><input type="checkbox" id="extremeBaozi"> 豹子</label>
         </div>
 
-        <div class="tc" style="margin-top:10px"><div class="fg"><label class="fl">倍投乘数</label><input type="number" class="fi" id="multiplierInput" value="2.0" step="0.1"></div><div class="fg"><label class="fl">最大倍投次数</label><input type="number" class="fi" id="maxLossInput" value="5"></div></div>
-        <div class="fg" style="margin-top:8px"><label style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer;margin-bottom:6px"><input type="checkbox" id="customTagOn" onchange="document.getElementById('customTag').classList.toggle('hidden',!this.checked)"> 启用自定义尾缀</label><input type="text" class="fi hidden" id="customTag" placeholder="输入尾缀文字" maxlength="30"></div>
-        <button class="btn bs" onclick="startBetting()">🚀 开始自动投注</button>
+        <div class="flex-row" style="margin-top:12px">
+            <div class="input-group" style="flex:1"><label class="input-label">倍投乘数</label><input class="input" id="multiplierInput" value="2.0" type="number" step="0.1"></div>
+            <div class="input-group" style="flex:1"><label class="input-label">最大倍投</label><input class="input" id="maxLossInput" value="5" type="number"></div>
+        </div>
+        <label class="checkbox-row" style="margin:6px 0">
+            <input type="checkbox" id="customTagOn" onchange="document.getElementById('customTag').classList.toggle('hidden',!this.checked)"> 自定义尾缀
+        </label>
+        <input class="input hidden" id="customTag" placeholder="尾缀文字" maxlength="30">
+        <button class="btn btn-success" onclick="startBetting()" style="margin-top:8px">开始自动投注</button>
     </div>
 
-    <div class="card hidden" id="panel-running"><div class="ct">📡 运行中 <span class="tag ts" id="runStatus">Active</span></div>
-        <div class="tc"><div><div class="fl">当前期号</div><div style="font-size:20px;font-weight:700" id="runQihao">--</div></div><div><div class="fl">杀组目标</div><div style="font-size:20px;font-weight:700;color:var(--dan)" id="runKill">--</div></div></div>
-        <div style="margin-top:8px"><div class="fl">下注预览</div><div style="background:var(--bg);padding:10px;border-radius:var(--rs);font-family:monospace;font-size:12px;white-space:pre-wrap" id="betPreview">--</div></div>
-        <div style="margin-top:8px"><div class="fl">日志</div><div class="la" id="logArea"><div>🟢 就绪</div></div></div>
-        <button class="btn bd" onclick="stopBetting()" style="margin-top:10px">🛑 停止</button>
+    <!-- 运行 -->
+    <div class="card hidden" id="panel-running">
+        <div class="card-header">运行中 <span class="tag tag-green" id="runStatus">Active</span></div>
+        <div class="flex-row" style="margin-bottom:10px">
+            <div style="flex:1"><div class="input-label">期号</div><div style="font-size:20px;font-weight:700" id="runQihao">--</div></div>
+            <div style="flex:1"><div class="input-label">杀组</div><div style="font-size:20px;font-weight:700;color:var(--red)" id="runKill">--</div></div>
+        </div>
+        <div class="input-label">投注预览</div>
+        <div style="background:var(--card2);padding:12px;border-radius:var(--radius-sm);font-size:13px;font-family:monospace;white-space:pre-wrap" id="betPreview">--</div>
+        <div class="input-label" style="margin-top:10px">日志</div>
+        <div class="log-area" id="logArea"><div>就绪</div></div>
+        <button class="btn btn-danger" onclick="stopBetting()" style="margin-top:10px">停止</button>
     </div>
+
 </div>
 
 <script>
@@ -159,7 +296,7 @@ function sa(){localStorage.setItem('p28a',JSON.stringify(S.amts))}
 var ws,wid='p28_'+Date.now();
 function cws(){
     ws=new WebSocket((location.protocol==='https:'?'wss':'ws')+'://'+location.host+'/ws/'+wid);
-    ws.onopen=function(){log('success','已连接');getLatest();ws.send(JSON.stringify({type:'check_status'}))};
+    ws.onopen=function(){log('green','已连接');getLatest();ws.send(JSON.stringify({type:'check_status'}))};
     ws.onmessage=function(e){try{hm(JSON.parse(e.data))}catch(ex){}};
     ws.onclose=function(){setTimeout(cws,3000)};
 }
@@ -169,119 +306,46 @@ function hm(d){
         d.accounts.forEach(function(a){S.accounts[a.phone]={phone:a.phone,name:a.name,channels:[]}});
         if(d.accounts.length>0){S.logged=true;S.selAcc=d.accounts[0].phone;ul(d.accounts[0].name);ws.send(JSON.stringify({type:'get_channels',phone:d.accounts[0].phone}));spn('channels')}
     }
-    else if(d.type==='send_code_result'){document.getElementById('btnLogin').disabled=false;if(d.already_logged_in){hls(d);return}if(d.success){S.phone=d.phone;document.getElementById('codeSection').classList.remove('hidden');document.getElementById('btnLogin').textContent='🔓 验证登录';document.getElementById('codeInput').focus()}else{document.getElementById('btnLogin').textContent='📨 发送验证码';log('error',d.error)}}
-    else if(d.type==='verify_code_result'){document.getElementById('btnLogin').disabled=false;if(d.need_password){document.getElementById('codeSection').classList.add('hidden');document.getElementById('passwordSection').classList.remove('hidden');document.getElementById('btnLogin').textContent='🔒 提交密码'}else if(d.success)hls(d);else{document.getElementById('btnLogin').textContent='🔓 验证登录';log('error',d.error)}}
-    else if(d.type==='verify_password_result'){document.getElementById('btnLogin').disabled=false;if(d.success)hls(d);else log('error',d.error)}
-    else if(d.type==='channels'&&d.success){var a=S.accounts[S.selAcc];if(a){a.channels=d.data;ucs();log('success',d.data.length+' 个群组')}}
-    else if(d.type==='latest_data'&&d.latest){document.getElementById('latestQihao').textContent='期号: '+d.latest.qihao;document.getElementById('latestResult').textContent=d.latest.combo+' ('+d.latest.sum+')';document.getElementById('latestSum').textContent=d.latest.number||'';document.getElementById('latestResult').className='res '+(d.latest.sum>=14?'big':'small')}
+    else if(d.type==='send_code_result'){document.getElementById('btnLogin').disabled=false;if(d.already_logged_in){hls(d);return}if(d.success){S.phone=d.phone;document.getElementById('codeSection').classList.remove('hidden');document.getElementById('btnLogin').textContent='验证登录';document.getElementById('codeInput').focus()}else{document.getElementById('btnLogin').textContent='发送验证码';log('red',d.error)}}
+    else if(d.type==='verify_code_result'){document.getElementById('btnLogin').disabled=false;if(d.need_password){document.getElementById('codeSection').classList.add('hidden');document.getElementById('pwdSection').classList.remove('hidden');document.getElementById('btnLogin').textContent='提交密码'}else if(d.success)hls(d);else{document.getElementById('btnLogin').textContent='验证登录';log('red',d.error)}}
+    else if(d.type==='verify_password_result'){document.getElementById('btnLogin').disabled=false;if(d.success)hls(d);else log('red',d.error)}
+    else if(d.type==='channels'&&d.success){var a=S.accounts[S.selAcc];if(a){a.channels=d.data;ucs();log('green',d.data.length+' 个群组')}}
+    else if(d.type==='latest_data'&&d.latest){document.getElementById('latestQihao').textContent=d.latest.qihao;var res=document.getElementById('latestResult');res.textContent=d.latest.combo+' ('+d.latest.sum+')';res.style.color=d.latest.sum>=14?'var(--red)':'var(--green)';document.getElementById('latestSum').textContent=d.latest.number||''}
     else if(d.type==='prediction'){
-        if(d.mode==='kill'){S.killed=d.kill_target;ucc();document.getElementById('killRate').textContent=d.win_rate+'%';document.getElementById('killModelInfo').textContent='模型#'+d.model_id;document.getElementById('killWinrate').style.display='flex';document.getElementById('latestQihao').textContent='期号: '+d.latest_qihao;document.getElementById('latestResult').textContent=d.latest_combo+' ('+d.latest_sum+')'}
-        else if(d.mode==='abc'){var h='';for(var b in d.results){var r=d.results[b];h+='<div class="wb" style="margin-bottom:6px"><span style="font-weight:700">'+b+'球</span><span>杀:</span><strong style="color:var(--dan);font-size:16px">'+r.kill_num+'</strong><span class="rate">'+(r.win_rate*100).toFixed(1)+'%</span><span style="font-size:11px;color:var(--text2)">模型#'+r.model_id+'</span>'+(r.status?'<span style="font-size:11px;color:var(--war)">'+r.status+'</span>':'')+'<div style="font-size:11px;color:var(--text2)">投: '+(r.bet_numbers||[]).join(',')+'</div></div>'}document.getElementById('abcResults').innerHTML=h||'<div class="tip">点击刷新获取预测</div>'}
+        if(d.mode==='kill'){S.killed=d.kill_target;ucc();document.getElementById('killRate').textContent=d.win_rate+'%';document.getElementById('killModelInfo').textContent='模型#'+d.model_id;document.getElementById('killWinrate').style.display='flex'}
+        else if(d.mode==='abc'){var h='';for(var b in d.results){var r=d.results[b];h+='<div class="stat-card"><span style="font-weight:600">'+b+'球</span><span style="color:var(--red)">杀'+r.kill_num+'</span><span class="rate">'+(r.win_rate*100).toFixed(1)+'%</span></div>'}document.getElementById('abcResults').innerHTML=h||'<div class="tip">点击刷新</div>'}
     }
-    else if(d.type==='betting_started'&&d.success){S.running=true;spn('running');log('success','已启动')}
-    else if(d.type==='betting_stopped'){S.running=false;log('warning','已停止')}
-    else if(d.type==='bet_log'){
-        log(d.error?'error':'info', d.message);
-        var m=d.message||'';
-        var km=m.match(/杀:(.+?) /);if(km){S.killed=km[1];document.getElementById('runKill').textContent=S.killed}
-        var qm=m.match(/期:(\d+)/);if(qm)document.getElementById('runQihao').textContent=qm[1];
-        if(m.indexOf('已发送')>=0||m.indexOf('杀组:')>=0) ubp();
-    }
+    else if(d.type==='betting_started'&&d.success){S.running=true;spn('running');log('green','已启动')}
+    else if(d.type==='betting_stopped'){S.running=false;log('orange','已停止')}
+    else if(d.type==='bet_log'){log(d.error?'red':'blue',d.message);var m=d.message||'';var km=m.match(/杀:(.+?) /);if(km){S.killed=km[1];document.getElementById('runKill').textContent=S.killed}var qm=m.match(/期:(\d+)/);if(qm)document.getElementById('runQihao').textContent=qm[1];if(m.indexOf('已发送')>=0)ubp()}
 }
-function hls(d){S.logged=true;S.phone=d.phone;if(!S.accounts[d.phone])S.accounts[d.phone]={phone:d.phone,name:d.name,channels:[]};S.accounts[d.phone].name=d.name;S.selAcc=d.phone;ul(d.name);document.getElementById('codeSection').classList.add('hidden');document.getElementById('passwordSection').classList.add('hidden');document.getElementById('btnLogin').textContent='📨 发送验证码';document.getElementById('btnLogin').disabled=false;log('success','登录成功');ws.send(JSON.stringify({type:'get_channels',phone:d.phone}));spn('channels')}
-function ul(n){document.getElementById('statusDot').classList.add('on');document.getElementById('statusText').textContent=n+' · 已登录'}
-
-function spn(n){if(S.hist[S.hist.length-1]!==n)S.hist.push(n);['login','channels','settings','running'].forEach(function(x){document.getElementById('panel-'+x).classList.toggle('hidden',x!==n)});document.getElementById('backBtn').classList.toggle('hidden',n==='login');if(n==='channels')uas();if(n==='settings'){ucc();rai();upl();refreshPrediction();toggleModePanels()}if(n==='running')ubp()}
-function goBack(){if(S.hist.length>1){S.hist.pop();spn(S.hist.pop())}}
-
-function handleLogin(){var ph=document.getElementById('phoneInput').value.trim();if(!ph.startsWith('+')){log('error','请输入正确手机号');return}if(!ws||ws.readyState!==1){cws();return}var btn=document.getElementById('btnLogin');if(!document.getElementById('codeSection').classList.contains('hidden')){var cd=document.getElementById('codeInput').value.trim();if(!cd){log('error','请输入验证码');return}btn.disabled=true;btn.textContent='...';ws.send(JSON.stringify({type:'verify_code',code:cd}))}else if(!document.getElementById('passwordSection').classList.contains('hidden')){var pw=document.getElementById('passwordInput').value.trim();if(!pw){log('error','请输入密码');return}btn.disabled=true;btn.textContent='...';ws.send(JSON.stringify({type:'verify_password',password:pw}))}else{btn.disabled=true;btn.textContent='发送中...';ws.send(JSON.stringify({type:'send_code',phone:ph}))}}
-
-function uas(){var s=document.getElementById('accountSelect');s.innerHTML='<option value="">-- 选择账号 --</option>';for(var p in S.accounts){var a=S.accounts[p];var o=document.createElement('option');o.value=p;o.textContent=a.name+' ('+p+')';if(p===S.selAcc)o.selected=true;s.appendChild(o)}if(S.selAcc)ucs()}
+function hls(d){S.logged=true;S.phone=d.phone;if(!S.accounts[d.phone])S.accounts[d.phone]={phone:d.phone,name:d.name,channels:[]};S.accounts[d.phone].name=d.name;S.selAcc=d.phone;ul(d.name);document.getElementById('codeSection').classList.add('hidden');document.getElementById('pwdSection').classList.add('hidden');document.getElementById('btnLogin').textContent='发送验证码';document.getElementById('btnLogin').disabled=false;log('green','登录成功');ws.send(JSON.stringify({type:'get_channels',phone:d.phone}));spn('channels')}
+function ul(n){document.getElementById('statusDot').classList.add('on');document.getElementById('statusText').textContent=n}
+function spn(n){if(S.hist[S.hist.length-1]!==n)S.hist.push(n);['login','channels','settings','running'].forEach(function(x){document.getElementById('panel-'+x).classList.toggle('hidden',x!==n)});if(n==='channels')uas();if(n==='settings'){ucc();rai();upl();refreshPrediction();togglePanels()}if(n==='running')ubp()}
+function handleLogin(){var ph=document.getElementById('phoneInput').value.trim();if(!ph.startsWith('+')){log('red','请输入正确手机号');return}if(!ws||ws.readyState!==1){cws();return}var btn=document.getElementById('btnLogin');if(!document.getElementById('codeSection').classList.contains('hidden')){var cd=document.getElementById('codeInput').value.trim();if(!cd){log('red','请输入验证码');return}btn.disabled=true;btn.textContent='验证中...';ws.send(JSON.stringify({type:'verify_code',code:cd}))}else if(!document.getElementById('pwdSection').classList.contains('hidden')){var pw=document.getElementById('passwordInput').value.trim();if(!pw){log('red','请输入密码');return}btn.disabled=true;btn.textContent='验证中...';ws.send(JSON.stringify({type:'verify_password',password:pw}))}else{btn.disabled=true;btn.textContent='发送中...';ws.send(JSON.stringify({type:'send_code',phone:ph}))}}
+function uas(){var s=document.getElementById('accountSelect');s.innerHTML='<option value="">选择账号</option>';for(var p in S.accounts){var a=S.accounts[p];var o=document.createElement('option');o.value=p;o.textContent=a.name+' ('+p+')';if(p===S.selAcc)o.selected=true;s.appendChild(o)}if(S.selAcc)ucs()}
 function onAccountChange(){S.selAcc=document.getElementById('accountSelect').value;if(S.selAcc)ucs();ccf()}
-function ucs(){var s=document.getElementById('channelSelect');s.innerHTML='<option value="">-- 选择频道 --</option>';var a=S.accounts[S.selAcc];if(a&&a.channels)a.channels.forEach(function(c){var o=document.createElement('option');o.value=JSON.stringify({id:c.id,name:c.name});o.textContent=(c.type==='channel'?'📢':'👥')+c.name;s.appendChild(o)})}
+function ucs(){var s=document.getElementById('channelSelect');s.innerHTML='<option value="">选择频道</option>';var a=S.accounts[S.selAcc];if(a&&a.channels)a.channels.forEach(function(c){var o=document.createElement('option');o.value=JSON.stringify({id:c.id,name:c.name});o.textContent=(c.type==='channel'?'频道':'群组')+' '+c.name;s.appendChild(o)})}
 function refreshChannels(){if(S.selAcc&&ws&&ws.readyState===1)ws.send(JSON.stringify({type:'get_channels',phone:S.selAcc}))}
 function ccf(){document.getElementById('btnConfirmChannel').disabled=!S.selAcc||!document.getElementById('channelSelect').value}
-function confirmChannel(){try{S.selCh=JSON.parse(document.getElementById('channelSelect').value);log('success','已选择: '+S.selCh.name);spn('settings')}catch(e){log('error','选择无效')}}
+function confirmChannel(){try{S.selCh=JSON.parse(document.getElementById('channelSelect').value);spn('settings')}catch(e){log('red','选择无效')}}
 document.addEventListener('change',function(e){if(e.target.id==='channelSelect')ccf()});
-
-function toggleModePanels(){
-    document.getElementById('panel-kill-mode').classList.toggle('hidden',!document.getElementById('modeKill').checked);
-    document.getElementById('panel-abc-mode').classList.toggle('hidden',!document.getElementById('modeAbc').checked);
-    document.getElementById('panel-extreme-mode').classList.toggle('hidden',!document.getElementById('modeExtreme').checked);
-}
-
-function savePlan(){var n=prompt('方案名称:','方案'+(Object.keys(S.plans).length+1));if(!n)return;S.plans[n]={amts:{...S.amts}};sp();upl();log('success','方案已保存')}
+function switchMode(m){S.mode=m;['kill','abc','extreme'].forEach(function(x){document.getElementById('tab-'+x).classList.toggle('active',x===m)})}
+function togglePanels(){document.getElementById('panel-kill').classList.toggle('hidden',!document.getElementById('modeKill').checked);document.getElementById('panel-abc').classList.toggle('hidden',!document.getElementById('modeAbc').checked);document.getElementById('panel-extreme').classList.toggle('hidden',!document.getElementById('modeExtreme').checked)}
+function savePlan(){var n=prompt('方案名称:','方案'+(Object.keys(S.plans).length+1));if(!n)return;S.plans[n]={amts:{...S.amts}};sp();upl()}
 function loadPlan(n){var p=S.plans[n];if(!p)return;S.amts={...p.amts};ucc();rai()}
 function deletePlan(n){if(confirm('删除?')){delete S.plans[n];sp();upl()}}
-function upl(){var e=document.getElementById('planList');var ns=Object.keys(S.plans);if(ns.length===0){e.innerHTML='<span style="color:var(--text2);font-size:12px">暂无方案</span>';return}e.innerHTML=ns.map(function(n){return '<span class="pi" onclick="loadPlan(\''+n+'\')" ondblclick="deletePlan(\''+n+'\')">'+n+'</span>'}).join('')}
-
-function ucc(){var e=document.getElementById('comboCards');e.innerHTML=C.map(function(c){var k=c===S.killed,cl=k?'kill':'bet';var tg=k?'<span class="ctag tag td">已杀</span>':'<span class="ctag tag ts">投注</span>';var am=S.amts[c]||0;return '<div class="cc '+cl+'">'+tg+'<div class="cn">'+c+'</div><div class="co">赔率 '+S.odds[c].r+'</div><div class="ca">'+(k?'跳过':(am>0?am+' KK':'未设置'))+'</div></div>'}).join('')}
-
-function rai(){
-    var h='';
-    C.forEach(function(c){
-        var o=S.odds[c],k=c===S.killed;
-        h+='<div class="ar"><span class="cl" style="color:'+(k?'var(--dan)':'var(--text)')+'">'+c+'</span><span class="ob '+(o.g==='low'?'ol':'oh')+'">'+o.r+'</span><input type="number" id="amt-'+c+'" value="'+(S.amts[c]||'')+'" placeholder="'+(k?'不投':'金额')+'" oninput="oai(\''+c+'\',this.value)" inputmode="decimal"></div>';
-    });
-    h+='<div class="tip">提前设好4个组合的金额，模型自动选杀，用剩下3个投注</div>';
-    document.getElementById('amountInputs').innerHTML=h;
-}
+function upl(){var e=document.getElementById('planList');var ns=Object.keys(S.plans);if(ns.length===0){e.innerHTML='<span style="color:var(--text2);font-size:12px">暂无方案</span>';return}e.innerHTML=ns.map(function(n){return '<span class="chip" onclick="loadPlan(\''+n+'\')" ondblclick="deletePlan(\''+n+'\')">'+n+'</span>'}).join('')}
+function ucc(){var e=document.getElementById('comboCards');e.innerHTML=C.map(function(c){var k=c===S.killed,cl=k?'killed':'bet';var tg=k?'<span class="tag tag-red">已杀</span>':'<span class="tag tag-green">投注</span>';var am=S.amts[c]||0;return '<div class="combo-box '+cl+'">'+tg+'<div class="name">'+c+'</div><div class="odds">赔率 '+S.odds[c].r+'</div><div class="amt">'+(k?'跳过':(am>0?am+' KK':'未设置'))+'</div></div>'}).join('')}
+function rai(){var h='';C.forEach(function(c){var o=S.odds[c],k=c===S.killed;h+='<div class="amt-row"><span class="label" style="color:'+(k?'var(--red)':'var(--text)')+'">'+c+'</span><span class="odds-badge '+(o.g==='low'?'odds-low':'odds-high')+'">'+o.r+'</span><input value="'+(S.amts[c]||'')+'" placeholder="'+(k?'不投':'金额')+'" oninput="oai(\''+c+'\',this.value)" inputmode="decimal"></div>'});h+='<div class="tip">设置4个组合的金额,模型自动选杀</div>';document.getElementById('amountInputs').innerHTML=h}
 function oai(c,v){S.amts[c]=parseInt(v)||0;ucc();sa()}
-
-function ie(){var g=document.getElementById('extremeGrid');EX.forEach(function(n){var e=document.createElement('div');e.className='ei';e.textContent=n;e.onclick=function(){var i=S.exts.indexOf(n);if(i>=0){S.exts.splice(i,1);e.classList.remove('sel')}else{S.exts.push(n);e.classList.add('sel')}};e.id='ex-'+n;g.appendChild(e)})}
-
+function ie(){var g=document.getElementById('extremeGrid');EX.forEach(function(n){var e=document.createElement('span');e.className='chip';e.textContent=n;e.onclick=function(){var i=S.exts.indexOf(n);if(i>=0){S.exts.splice(i,1);e.classList.remove('selected')}else{S.exts.push(n);e.classList.add('selected')}};g.appendChild(e)})}
 function refreshPrediction(){if(!ws||ws.readyState!==1)return;if(document.getElementById('modeKill').checked)ws.send(JSON.stringify({type:'get_prediction',mode:'kill'}));if(document.getElementById('modeAbc').checked){var b=[];if(document.getElementById('abcA').checked)b.push('A');if(document.getElementById('abcB').checked)b.push('B');if(document.getElementById('abcC').checked)b.push('C');ws.send(JSON.stringify({type:'get_prediction',mode:'abc',balls:b}))}}
 function getLatest(){if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'get_latest'}))}
-
-function startBetting(){
-    if(!S.logged){log('error','请先登录');spn('login');return}
-    if(!S.selCh.id){log('error','请先选择频道');spn('channels');return}
-    var modes=[];
-    if(document.getElementById('modeKill').checked)modes.push('kill');
-    if(document.getElementById('modeAbc').checked)modes.push('abc');
-    if(document.getElementById('modeExtreme').checked)modes.push('extreme');
-    if(modes.length===0){log('error','至少选一个模式');return}
-    var cf={
-        modes:modes,
-        amounts:S.amts,
-        killedCombo:S.killed,
-        abcBalls:[],
-        abcAmount:parseInt(document.getElementById('abcAmount')?.value||1000),
-        extremeNumbers:S.exts,
-        extremeAmount:parseInt(document.getElementById('extremeAmount')?.value||1000),
-        extremeBaozi:document.getElementById('extremeBaozi')?.checked||false,
-        multiplier:parseFloat(document.getElementById('multiplierInput').value),
-        maxLoss:parseInt(document.getElementById('maxLossInput').value)
-    };
-    if(document.getElementById('abcA')?.checked)cf.abcBalls.push('A');
-    if(document.getElementById('abcB')?.checked)cf.abcBalls.push('B');
-    if(document.getElementById('abcC')?.checked)cf.abcBalls.push('C');
-    if(document.getElementById('customTagOn').checked)cf.customTag=document.getElementById('customTag').value.trim();
-    if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'start_betting',phone:S.selAcc,channel_id:S.selCh.id,mode:'multi',config:cf}));
-}
+function startBetting(){if(!S.logged){spn('login');return}if(!S.selCh.id){spn('channels');return}var modes=[];if(document.getElementById('modeKill').checked)modes.push('kill');if(document.getElementById('modeAbc').checked)modes.push('abc');if(document.getElementById('modeExtreme').checked)modes.push('extreme');var cf={modes:modes,amounts:S.amts,killedCombo:S.killed,abcBalls:[],abcAmount:parseInt(document.getElementById('abcAmount')?.value||1000),extremeNumbers:S.exts,extremeAmount:parseInt(document.getElementById('extremeAmount')?.value||1000),extremeBaozi:document.getElementById('extremeBaozi')?.checked||false,multiplier:parseFloat(document.getElementById('multiplierInput').value),maxLoss:parseInt(document.getElementById('maxLossInput').value)};if(document.getElementById('abcA')?.checked)cf.abcBalls.push('A');if(document.getElementById('abcB')?.checked)cf.abcBalls.push('B');if(document.getElementById('abcC')?.checked)cf.abcBalls.push('C');if(document.getElementById('customTagOn').checked)cf.customTag=document.getElementById('customTag').value.trim();if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'start_betting',phone:S.selAcc,channel_id:S.selCh.id,mode:'multi',config:cf}))}
 function stopBetting(){if(ws&&ws.readyState===1)ws.send(JSON.stringify({type:'stop_betting',phone:S.selAcc,channel_id:S.selCh.id}));S.running=false;document.getElementById('runStatus').textContent='已停止'}
-
-function ubp(){
-    var p=[];
-    if(document.getElementById('modeKill')?.checked){
-        p.push(C.filter(function(c){return c!==S.killed}).map(function(c){return c+S.amts[c]}).join(' '));
-        document.getElementById('runKill').textContent=S.killed||'--';
-    }
-    if(document.getElementById('modeAbc')?.checked){
-        var amt=document.getElementById('abcAmount')?.value||1000;
-        p.push('ABC杀码: 杀一码投9号各'+amt);
-    }
-    if(document.getElementById('modeExtreme')?.checked){
-        var amt=document.getElementById('extremeAmount')?.value||1000;
-        var parts=S.exts.map(function(n){return n+'/'+amt});
-        if(document.getElementById('extremeBaozi')?.checked)parts.push('豹子'+amt);
-        p.push(parts.join('\n'));
-    }
-    document.getElementById('betPreview').textContent=p.join('\n\n')||'--';
-}
-
-function log(t,m){var a=document.getElementById('logArea');a.innerHTML+='<div class="l'+(t==='success'?'s':t==='error'?'e':t==='warning'?'w':'i')+'">['+new Date().toLocaleTimeString()+'] '+m+'</div>';a.scrollTop=a.scrollHeight}
-
+function ubp(){var p=[];if(document.getElementById('modeKill')?.checked){p.push(C.filter(function(c){return c!==S.killed}).map(function(c){return c+S.amts[c]}).join(' '));document.getElementById('runKill').textContent=S.killed||'--'}if(document.getElementById('modeAbc')?.checked)p.push('ABC: 杀一码投9号');if(document.getElementById('modeExtreme')?.checked)p.push('极值: '+S.exts.join(',')+(document.getElementById('extremeBaozi')?.checked?' +豹子':''));document.getElementById('betPreview').textContent=p.join('\n')||'--'}
+function log(t,m){var a=document.getElementById('logArea');a.innerHTML+='<div class="log-'+t+'">['+new Date().toLocaleTimeString()+'] '+m+'</div>';a.scrollTop=a.scrollHeight}
 document.addEventListener('DOMContentLoaded',function(){lp();la();cws();ie();setInterval(getLatest,30000)});
 </script>
 </body>
